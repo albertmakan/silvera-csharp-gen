@@ -1,0 +1,9 @@
+/**{{header_comment}}*/
+
+namespace {{service_name}}.Messaging.Messages
+{
+    public interface IMessage
+    {
+        string ToJson();
+    }
+}

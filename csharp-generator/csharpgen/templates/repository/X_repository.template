@@ -1,0 +1,15 @@
+/**{{header_comment}}*/
+
+using {{service_name}}.Models;
+using {{service_name}}.Repository.Contracts;
+using {{service_name}}.Settings;
+
+namespace {{service_name}}.Repository.Impl
+{
+    public class {{typedef}}Repository : Repository<{{typedef}}>, I{{typedef}}Repository
+    {
+        public {{typedef}}Repository(IMongoDbSettings settings) : base(settings) { }
+
+        // implement custom repo methods
+    }
+}

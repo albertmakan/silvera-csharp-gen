@@ -1,0 +1,14 @@
+/**{{header_comment}}*/
+
+using System.ComponentModel.DataAnnotations;
+
+namespace {{service_name}}.Models{{".Dependencies" if dependency else ""}}
+{
+    public class {{name}} : Document
+    {
+        {% for attr in attributes %}
+        {%- if attr.required %}[Required]{%- endif %}
+        public {{attr.type|convert_type}} {{attr.name|first_upper}} { get; set; }
+        {% endfor %}
+    }
+}
