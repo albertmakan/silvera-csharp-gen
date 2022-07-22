@@ -5,7 +5,8 @@ from silvera.generator.registration import GeneratorDesc
 
 from csharpgen.type_converter import convert_type
 from csharpgen.utils import get_templates_path
-from silvera.core import ServiceDecl
+from silvera.core import ServiceDecl, Function, FunctionParameter
+from silvera.const import *
 from csharpgen.project_struct import create_if_missing, csharp_struct
 
 
@@ -28,14 +29,25 @@ class ServiceGenerator:
         env.filters["first_upper"] = lambda x: x[0].upper() + x[1:]
         env.filters["first_lower"] = lambda x: x[0].lower() + x[1:]
         env.filters["convert_type"] = convert_type
+        env.filters["unfold_function_params"] = lambda f: \
+            ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
+        env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
         return env
 
     def generate(self):
         self.generate_model()
         self.generate_repositories()
+        if self.service.produces:
+            self.generate_message_producer()
+        if self.service.consumes:
+            self.generate_message_consumer()
+        self.generate_other_files()
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
+        self.env.get_template("models/document.template").stream({
+            "service_name": self.service.name, "header_comment": get_comment()
+        }).dump(os.path.join(models_path, "IDocument.cs"))
 
         for typedef in self.service.api.typedefs:
             id_attr = None
@@ -70,25 +82,78 @@ class ServiceGenerator:
         impl_path = create_if_missing(os.path.join(repo_path, "Impl"))
         d = {"service_name": self.service.name, "header_comment": get_comment()}
         self.env.get_template("repository/i_repository.template").stream(d).dump(
-            os.path.join(base_path, "IRepository.cs")
-        )
+            os.path.join(base_path, "IRepository.cs"))
         self.env.get_template("repository/repository.template").stream(d).dump(
-            os.path.join(impl_path, "Repository.cs")
-        )
+            os.path.join(impl_path, "Repository.cs"))
         for typedef in self.service.api.typedefs:
             d["typedef"] = typedef.name
             d["header_comment"] = get_comment()
             self.env.get_template("repository/iX_repository.template").stream(d).dump(
-                os.path.join(base_path, f"I{typedef.name}Repository.cs")
-            )
+                os.path.join(base_path, f"I{typedef.name}Repository.cs"))
             self.env.get_template("repository/X_repository.template").stream(d).dump(
-                os.path.join(impl_path, f"{typedef.name}Repository.cs")
-            )
+                os.path.join(impl_path, f"{typedef.name}Repository.cs"))
+
+    def generate_message_producer(self):
+        msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
+        messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
+        d = {"service_name": self.service.name, "header_comment": get_comment()}
+        self.env.get_template("messaging/i_message.template").stream(d).dump(
+            os.path.join(messages_path, "IMessage.cs"))
+        self.env.get_template("messaging/producer.template").stream(d).dump(
+            os.path.join(msg_path, "KafkaProducer.cs"))
+
+    def generate_message_consumer(self):
+        msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
+        messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
+        d = {"service_name": self.service.name, "header_comment": get_comment()}
+        self.env.get_template("messaging/i_message.template").stream(d).dump(
+            os.path.join(messages_path, "IMessage.cs"))
+        self.env.get_template("messaging/consumer.template").stream(d).dump(
+            os.path.join(msg_path, "KafkaConsumer.cs"))
+
+    def generate_other_files(self):
+        d = {"service_name": self.service.name, "header_comment": get_comment()}
+        self.env.get_template("others/exceptions.template").stream(d).dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Exceptions")),
+                         "CustomExceptions.cs"))
+        self.env.get_template("others/error_middleware.template").stream(d).dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Middleware")),
+                         "ErrorHandlerMiddleware.cs"))
+        self.env.get_template("others/validate_model_attribute.template").stream(d).dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Filters")),
+                         "ValidateModelAttribute.cs"))
+
+    def unfold_controller_function_params(self, func: Function):
+        params, from_body = [], []
+        for p in func.params:
+            if p.url_placeholder:
+                params.append(f"[FromRoute] {convert_type(p.type)} {p.name}")
+            elif p.query_param:
+                params.append(f"[FromQuery] {convert_type(p.type)} {p.name}")
+            elif func.http_verb in {HTTP_POST, HTTP_PUT}:
+                from_body.append(p)
+            else:
+                params.append(f"[FromQuery] {convert_type(p.type)} {p.name}")
+        if from_body:
+            dto = self.generate_dto(func.name+"Request", from_body)
+            params.append(f"[FromBody] {dto} request")
+        return ", ".join(params)
+
+    def generate_dto(self, name: str, params: list[FunctionParameter]):
+        dto_path = create_if_missing(os.path.join(self.main_path, "DTO"))
+        self.env.get_template("controllers/dto.template").stream({
+            "service_name": self.service.name, "header_comment": get_comment(),
+            "name": name,
+            "fields": [(p.type, p.name) for p in params]
+        }).dump(os.path.join(dto_path, name+".cs"))
+        return name
 
 
 def generate(service: ServiceDecl, output_dir, debug):
     print("Called C#!")
     print(service, output_dir)
+    for d in service.dep_functions:
+        print(d.name, d.ret_type)
     ServiceGenerator(service, output_dir).generate()
 
 

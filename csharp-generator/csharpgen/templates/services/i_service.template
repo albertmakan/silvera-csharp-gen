@@ -1,0 +1,44 @@
+/**{{header_comment}}*/
+
+using {{service_name}}.Models;
+
+namespace {{service_name}}.Services.Base
+{
+    public interface I{{service_name}}Service
+    {
+        Paper CreatePaper(Paper paper);
+        Paper UpdatePaper(Paper paperUpdate);
+        Paper ReadPaper(string id);
+        void DeletePaper(string id);
+
+        // todo Auto-generated CRUD methods
+        {%for typedef, id_datatype, crud_dict in typedefs %}
+        {% set id_datatype = id_datatype|converttype %}
+        {% if "@create" in crud_dict %}
+        public {{typedef}} create{{typedef}}({{typedef}} {{typedef|lower}});
+        {% endif %}
+        {% if "@update" in crud_dict %}
+        public {{typedef}} update{{typedef}}({{id_datatype}} id, {{typedef}} {{typedef|lower}}Update);
+        {% endif %}
+        {% if "@read" in crud_dict %}
+        public {{typedef}} read{{typedef}}({{id_datatype}} id);
+        {% endif %}
+        {% if "@delete" in crud_dict %}
+        public void delete{{typedef}}({{id_datatype}} id);
+        {% endif %}
+        {% endfor%}
+
+        {% for function in functions %}
+        public {{function|return_type}} {{function.name}}({{function|unfold_function_params}});
+        {% endfor %}
+
+        {% for msg_fqn in consumers_per_message %}
+        {% for function in consumers_per_message[msg_fqn] %}
+        public void {{function.name}}(com.silvera.{{package_name}}.messages.{{msg_fqn}} message);
+        {% endfor %}
+        {% endfor %}
+
+        //todo for producer
+        void Publish(string paperId, string authorId);
+    }
+}
