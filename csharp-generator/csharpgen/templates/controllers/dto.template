@@ -2,7 +2,7 @@
 
 namespace {{service_name}}.DTO
 {
-    public class {{name|first_upper}}
+    public class {{name}}
     {
         {% for (type, name) in fields %}
         public {{type|convert_type}} {{name|first_upper}} { get; set; }

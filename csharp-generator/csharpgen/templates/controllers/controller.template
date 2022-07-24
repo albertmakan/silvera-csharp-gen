@@ -1,0 +1,68 @@
+/**{{header_comment}}*/
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using {{service_name}}.DTO;
+using {{service_name}}.Filters;
+using {{service_name}}.Models;
+using {{service_name}}.Services.Base;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace {{service_name}}.Controllers
+{
+    [ApiController]
+    [Produces("application/json")]
+    [ValidateModel]
+    public class {{service_name}}Controller : ControllerBase
+    {
+        private readonly I{{service_name}}Service _{{service_name|first_lower}}Service;
+
+        public {{service_name}}Controller(I{{service_name}}Service {{service_name|first_lower}}Service)
+        {
+            _{{service_name|first_lower}}Service = {{service_name|first_lower}}Service;
+        }
+
+        {%- for t in api.typedefs %}
+        {% if "@create" in t.crud_dict %}
+        [HttpPost("{{t.name|lower}}")]
+        public {{t.name}} Create{{t.name}}({{t.name}} {{t.name|lower}})
+        {
+            return _{{service_name|first_lower}}Service.Create{{t.name}}({{t.name|lower}});
+        }
+        {%- endif %}
+        {% if "@read" in t.crud_dict %}
+        [HttpGet("{{t.name|lower}}/{id}")]
+        public {{t.name}} Read{{t.name}}(string id)
+        {
+            return _{{service_name|first_lower}}Service.Read{{t.name}}(id);
+        }
+        {%- endif %}
+        {% if "@update" in t.crud_dict %}
+        [HttpPut("{{t.name|lower}}/{id}")]
+        public {{t.name}} Update{{t.name}}(string id, {{t.name}} {{t.name|lower}})
+        {
+            return _{{service_name|first_lower}}Service.Update{{t.name}}({{t.name|lower}});
+        }
+        {%- endif %}
+        {% if "@delete" in t.crud_dict %}
+        [HttpDelete("{{t.name|lower}}/{id}")]
+        public void Delete{{t.name}}(string id)
+        {
+            _{{service_name|first_lower}}Service.Delete{{t.name}}(id);
+        }
+        {%- endif %}
+        {%- endfor %}
+        {%- for function in api.functions %}
+        [Http{{function.http_verb|title}}("{{function.rest_path.split('?')[0]}}")]
+        public {{"async Task<"+function.ret_type|convert_type+">" if function.is_async()
+                    else function.ret_type|convert_type}} {{function.name|first_upper -}}
+            ({{function|unfold_controller_function_params}})
+        {
+            {{"" if function.ret_type == "void" else "return " -}}
+            {{"await " if function.is_async() else "" -}}
+            _{{service_name|first_lower}}Service.{{function.name|first_upper}}({{function|param_names}});
+        }
+        {% endfor %}
+    }
+}

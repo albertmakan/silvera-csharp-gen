@@ -42,7 +42,11 @@ namespace {{service_name}}.Services.Dependencies
 
         protected override async Task<string> RunAsync()
         {
-            return await _httpClient.GetFromJsonAsync<string>($"api/User/getname/{Username}");
+            await _httpClient.PostAsJsonAsync<string>("/", Username);
+            await _httpClient.PutAsJsonAsync<string>("/", Username);
+            await _httpClient.DeleteAsync("/");
+
+            return await _httpClient.GetFromJsonAsync<string>($"getname/{Username}");
         }
 
         protected override string RunFallback()

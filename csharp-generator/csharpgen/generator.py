@@ -17,6 +17,21 @@ def get_comment():
 """
 
 
+def first_upper(s: str):
+    return s[0].upper() + s[1:]
+
+
+def first_lower(s: str):
+    return s[0].lower() + s[1:]
+
+
+def param_names(func: Function):
+    is_dto = len([p for p in func.params if not (p.url_placeholder or p.query_param)]) > 1
+    return ", ".join(
+        [p.name if p.url_placeholder or p.query_param or not is_dto
+         else "request."+first_upper(p.name) for p in func.params])
+
+
 class ServiceGenerator:
     def __init__(self, service: ServiceDecl, output_dir):
         self.service = service
@@ -26,12 +41,13 @@ class ServiceGenerator:
 
     def _init_env(self):
         env = Environment(loader=FileSystemLoader(self.templates_path))
-        env.filters["first_upper"] = lambda x: x[0].upper() + x[1:]
-        env.filters["first_lower"] = lambda x: x[0].lower() + x[1:]
+        env.filters["first_upper"] = first_upper
+        env.filters["first_lower"] = first_lower
         env.filters["convert_type"] = convert_type
         env.filters["unfold_function_params"] = lambda f: \
             ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
+        env.filters["param_names"] = param_names
         return env
 
     def generate(self):
@@ -42,6 +58,7 @@ class ServiceGenerator:
         if self.service.consumes:
             self.generate_message_consumer()
         self.generate_other_files()
+        self.generate_controller()
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
@@ -134,9 +151,12 @@ class ServiceGenerator:
                 from_body.append(p)
             else:
                 params.append(f"[FromQuery] {convert_type(p.type)} {p.name}")
-        if from_body:
-            dto = self.generate_dto(func.name+"Request", from_body)
+                p.query_param = True
+        if len(from_body) > 1:
+            dto = self.generate_dto(first_upper(func.name)+"Request", from_body)
             params.append(f"[FromBody] {dto} request")
+        elif from_body:
+            params.append(f"[FromBody] {convert_type(from_body[0].type)} {from_body[0].name}")
         return ", ".join(params)
 
     def generate_dto(self, name: str, params: list[FunctionParameter]):
@@ -147,6 +167,30 @@ class ServiceGenerator:
             "fields": [(p.type, p.name) for p in params]
         }).dump(os.path.join(dto_path, name+".cs"))
         return name
+
+    def generate_dependency_services(self):
+        services_path = create_if_missing(os.path.join(self.main_path, "Services"))
+        dep_path = create_if_missing(os.path.join(services_path, "Dependencies"))
+
+    def generate_service(self):
+        services_path = create_if_missing(os.path.join(self.main_path, "Services"))
+        base_path = create_if_missing(os.path.join(services_path, "Base"))
+        impl_path = create_if_missing(os.path.join(services_path, "Impl"))
+
+    def generate_controller(self):
+        controller_path = create_if_missing(os.path.join(self.main_path, "Controllers"))
+        self.env.get_template("controllers/controller.template").stream({
+            "service_name": self.service.name,
+            "api": self.service.api,
+            "header_comment": get_comment(),
+        }).dump(os.path.join(controller_path, self.service.name + "Controller.cs"))
+
+
+    def generate_setup(self):
+        pass
+
+    def generate_settings(self):
+        settings_path = create_if_missing(os.path.join(self.main_path, "Settings"))
 
 
 def generate(service: ServiceDecl, output_dir, debug):
