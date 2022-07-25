@@ -1,9 +1,10 @@
 import os
+from collections import defaultdict
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from silvera.generator.registration import GeneratorDesc
 
-from csharpgen.type_converter import convert_type
+from csharpgen.type_converter import convert_type, convert_ret_type, get_default_for_cb_pattern
 from csharpgen.utils import get_templates_path
 from silvera.core import ServiceDecl, Function, FunctionParameter
 from silvera.const import *
@@ -32,6 +33,23 @@ def param_names(func: Function):
          else "request."+first_upper(p.name) for p in func.params])
 
 
+def request_uri_and_body(func: Function):
+    query_params, from_body = [], []
+    for p in func.params:
+        if p.query_param:
+            query_params.append(p.name)
+        elif p.url_placeholder:
+            pass
+        elif func.http_verb in {HTTP_POST, HTTP_PUT}:
+            from_body.append(p.name)
+        else:
+            query_params.append(p.name)
+    query_params_str = '?'+'&'.join([f'{{{n}.ToQueryString("{n}")}}' for n in query_params])
+    from_body_str = from_body[0] if len(from_body) == 1 else f'new {{ {", ".join(from_body)} }}'
+    request_uri = f'$"{func.rest_path.split("?")[0]}{query_params_str if query_params else ""}"'
+    return f'{request_uri}, {from_body_str}' if from_body else request_uri
+
+
 class ServiceGenerator:
     def __init__(self, service: ServiceDecl, output_dir):
         self.service = service
@@ -44,10 +62,13 @@ class ServiceGenerator:
         env.filters["first_upper"] = first_upper
         env.filters["first_lower"] = first_lower
         env.filters["convert_type"] = convert_type
+        env.filters["convert_ret_type"] = convert_ret_type
         env.filters["unfold_function_params"] = lambda f: \
             ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
         env.filters["param_names"] = param_names
+        env.filters["get_default_ret_val"] = get_default_for_cb_pattern
+        env.filters["request_uri_and_body"] = request_uri_and_body
         return env
 
     def generate(self):
@@ -59,6 +80,7 @@ class ServiceGenerator:
             self.generate_message_consumer()
         self.generate_other_files()
         self.generate_controller()
+        self.generate_dependency_services()
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
@@ -172,6 +194,27 @@ class ServiceGenerator:
         services_path = create_if_missing(os.path.join(self.main_path, "Services"))
         dep_path = create_if_missing(os.path.join(services_path, "Dependencies"))
 
+        fns_by_service = defaultdict(list)
+        use_circuit_breaker = False
+        for fn in self.service.dep_functions:
+            if fn.cb_pattern not in {None, "fail_fast"}:
+                use_circuit_breaker = True
+            fns_by_service[fn.service_name].append(fn)
+
+        for s in self.service.dependencies:
+            self.env.get_template("services/dependency_service.template").stream({
+                "service_name": self.service.name,
+                "header_comment": get_comment(),
+                "dependency_service_name": s.name,
+                "constructor_params": ', '.join([f'{first_upper(f.name)}Command {f.name}Command'
+                                                 for f in fns_by_service[s.name]]),
+                "functions": fns_by_service[s.name],
+                "has_domain_dependencies": len(self.service.dep_typedefs) > 0,
+                "use_circuit_breaker": use_circuit_breaker,
+                "uses_registry": True if s.service_registry else False,
+                "service_url": f"{s.url}:{s.port}"
+            }).dump(os.path.join(dep_path, s.name + "Client.cs"))
+
     def generate_service(self):
         services_path = create_if_missing(os.path.join(self.main_path, "Services"))
         base_path = create_if_missing(os.path.join(services_path, "Base"))
@@ -185,9 +228,12 @@ class ServiceGenerator:
             "header_comment": get_comment(),
         }).dump(os.path.join(controller_path, self.service.name + "Controller.cs"))
 
-
-    def generate_setup(self):
-        pass
+    def generate_startup(self):
+        self.env.get_template("startup.template").stream({
+            "service_name": self.service.name,
+            "header_comment": get_comment(),
+            "": None,
+        }).dump(os.path.join(self.main_path, "Startup.cs"))
 
     def generate_settings(self):
         settings_path = create_if_missing(os.path.join(self.main_path, "Settings"))

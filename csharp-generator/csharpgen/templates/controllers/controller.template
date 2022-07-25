@@ -6,8 +6,6 @@ using {{service_name}}.DTO;
 using {{service_name}}.Filters;
 using {{service_name}}.Models;
 using {{service_name}}.Services.Base;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace {{service_name}}.Controllers
 {
@@ -55,8 +53,7 @@ namespace {{service_name}}.Controllers
         {%- endfor %}
         {%- for function in api.functions %}
         [Http{{function.http_verb|title}}("{{function.rest_path.split('?')[0]}}")]
-        public {{"async Task<"+function.ret_type|convert_type+">" if function.is_async()
-                    else function.ret_type|convert_type}} {{function.name|first_upper -}}
+        public {{"async " if function.is_async() else "" }}{{function|convert_ret_type}} {{function.name|first_upper -}}
             ({{function|unfold_controller_function_params}})
         {
             {{"" if function.ret_type == "void" else "return " -}}
