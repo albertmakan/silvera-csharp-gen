@@ -1,4 +1,4 @@
-/**{{header_comment}}*/
+/**{{header_comment()}}*/
 
 using {{service_name}}.Utils;
 using Steeltoe.CircuitBreaker.Hystrix;
@@ -37,7 +37,7 @@ namespace {{service_name}}.Services.Dependencies
         {% endfor %}
     }
 
-    {% for function in functions -%}
+    {% for function in functions %}
     public class {{function.name|first_upper}}Command : HystrixCommand<{{function.ret_type|convert_type}}>
     {
         private readonly HttpClient _httpClient;

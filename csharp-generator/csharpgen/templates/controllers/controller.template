@@ -1,4 +1,4 @@
-/**{{header_comment}}*/
+/**{{header_comment()}}*/
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

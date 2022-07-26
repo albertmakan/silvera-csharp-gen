@@ -2,12 +2,13 @@ import os
 from collections import defaultdict
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
+
 from silvera.generator.registration import GeneratorDesc
+from silvera.core import ServiceDecl, Function, FunctionParameter
+from silvera.const import *
 
 from csharpgen.type_converter import convert_type, convert_ret_type, get_default_for_cb_pattern
 from csharpgen.utils import get_templates_path
-from silvera.core import ServiceDecl, Function, FunctionParameter
-from silvera.const import *
 from csharpgen.project_struct import create_if_missing, csharp_struct
 
 
@@ -35,19 +36,20 @@ def param_names(func: Function):
 
 def request_uri_and_body(func: Function):
     query_params, from_body = [], []
+    post_or_put = func.http_verb == HTTP_POST or func.http_verb == HTTP_PUT
     for p in func.params:
         if p.query_param:
             query_params.append(p.name)
         elif p.url_placeholder:
-            pass
-        elif func.http_verb in {HTTP_POST, HTTP_PUT}:
+            continue
+        elif post_or_put:
             from_body.append(p.name)
         else:
             query_params.append(p.name)
     query_params_str = '?'+'&'.join([f'{{{n}.ToQueryString("{n}")}}' for n in query_params])
     from_body_str = from_body[0] if len(from_body) == 1 else f'new {{ {", ".join(from_body)} }}'
     request_uri = f'$"{func.rest_path.split("?")[0]}{query_params_str if query_params else ""}"'
-    return f'{request_uri}, {from_body_str}' if from_body else request_uri
+    return f'{request_uri}, {from_body_str}' if post_or_put else request_uri
 
 
 class ServiceGenerator:
@@ -59,16 +61,21 @@ class ServiceGenerator:
 
     def _init_env(self):
         env = Environment(loader=FileSystemLoader(self.templates_path))
+
         env.filters["first_upper"] = first_upper
         env.filters["first_lower"] = first_lower
         env.filters["convert_type"] = convert_type
         env.filters["convert_ret_type"] = convert_ret_type
-        env.filters["unfold_function_params"] = lambda f: \
-            ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
+        env.filters["unfold_function_params"] = \
+            lambda f: ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
         env.filters["param_names"] = param_names
         env.filters["get_default_ret_val"] = get_default_for_cb_pattern
         env.filters["request_uri_and_body"] = request_uri_and_body
+
+        env.globals["service_name"] = self.service.name
+        env.globals["header_comment"] = get_comment
+
         return env
 
     def generate(self):
@@ -84,9 +91,7 @@ class ServiceGenerator:
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
-        self.env.get_template("models/document.template").stream({
-            "service_name": self.service.name, "header_comment": get_comment()
-        }).dump(os.path.join(models_path, "IDocument.cs"))
+        self.env.get_template("models/document.template").stream().dump(os.path.join(models_path, "IDocument.cs"))
 
         for typedef in self.service.api.typedefs:
             id_attr = None
@@ -95,11 +100,9 @@ class ServiceGenerator:
                     id_attr = attr
             self.env.get_template("models/dataclass.template").stream({
                 "dependency": False,
-                "service_name": self.service.name,
                 "name": typedef.name,
                 "attributes": typedef.fields,
                 "id_attr": id_attr,
-                "header_comment": get_comment()
             }).dump(os.path.join(models_path, typedef.name + ".cs"))
 
         if not self.service.dep_typedefs:
@@ -109,24 +112,20 @@ class ServiceGenerator:
         for typedef in self.service.dep_typedefs:
             self.env.get_template("models/dataclass.template").stream({
                 "dependency": True,
-                "service_name": self.service.name,
                 "name": typedef.name,
                 "attributes": typedef.fields,
-                "header_comment": get_comment()
             }).dump(os.path.join(dependencies_path, typedef.name + ".cs"))
 
     def generate_repositories(self):
         repo_path = create_if_missing(os.path.join(self.main_path, "Repository"))
         base_path = create_if_missing(os.path.join(repo_path, "Contracts"))
         impl_path = create_if_missing(os.path.join(repo_path, "Impl"))
-        d = {"service_name": self.service.name, "header_comment": get_comment()}
-        self.env.get_template("repository/i_repository.template").stream(d).dump(
+        self.env.get_template("repository/i_repository.template").stream().dump(
             os.path.join(base_path, "IRepository.cs"))
-        self.env.get_template("repository/repository.template").stream(d).dump(
+        self.env.get_template("repository/repository.template").stream().dump(
             os.path.join(impl_path, "Repository.cs"))
         for typedef in self.service.api.typedefs:
-            d["typedef"] = typedef.name
-            d["header_comment"] = get_comment()
+            d = {"typedef": typedef.name}
             self.env.get_template("repository/iX_repository.template").stream(d).dump(
                 os.path.join(base_path, f"I{typedef.name}Repository.cs"))
             self.env.get_template("repository/X_repository.template").stream(d).dump(
@@ -135,32 +134,26 @@ class ServiceGenerator:
     def generate_message_producer(self):
         msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
         messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
-        d = {"service_name": self.service.name, "header_comment": get_comment()}
-        self.env.get_template("messaging/i_message.template").stream(d).dump(
+        self.env.get_template("messaging/i_message.template").stream().dump(
             os.path.join(messages_path, "IMessage.cs"))
-        self.env.get_template("messaging/producer.template").stream(d).dump(
+        self.env.get_template("messaging/producer.template").stream().dump(
             os.path.join(msg_path, "KafkaProducer.cs"))
 
     def generate_message_consumer(self):
         msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
         messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
-        d = {"service_name": self.service.name, "header_comment": get_comment()}
-        self.env.get_template("messaging/i_message.template").stream(d).dump(
+        self.env.get_template("messaging/i_message.template").stream().dump(
             os.path.join(messages_path, "IMessage.cs"))
-        self.env.get_template("messaging/consumer.template").stream(d).dump(
+        self.env.get_template("messaging/consumer.template").stream().dump(
             os.path.join(msg_path, "KafkaConsumer.cs"))
 
     def generate_other_files(self):
-        d = {"service_name": self.service.name, "header_comment": get_comment()}
-        self.env.get_template("others/exceptions.template").stream(d).dump(
-            os.path.join(create_if_missing(os.path.join(self.main_path, "Exceptions")),
-                         "CustomExceptions.cs"))
-        self.env.get_template("others/error_middleware.template").stream(d).dump(
-            os.path.join(create_if_missing(os.path.join(self.main_path, "Middleware")),
-                         "ErrorHandlerMiddleware.cs"))
-        self.env.get_template("others/validate_model_attribute.template").stream(d).dump(
-            os.path.join(create_if_missing(os.path.join(self.main_path, "Filters")),
-                         "ValidateModelAttribute.cs"))
+        self.env.get_template("others/exceptions.template").stream().dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Exceptions")), "CustomExceptions.cs"))
+        self.env.get_template("others/error_middleware.template").stream().dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Middleware")), "ErrorHandlerMiddleware.cs"))
+        self.env.get_template("others/validate_model_attribute.template").stream().dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Filters")), "ValidateModelAttribute.cs"))
 
     def unfold_controller_function_params(self, func: Function):
         params, from_body = [], []
@@ -184,7 +177,6 @@ class ServiceGenerator:
     def generate_dto(self, name: str, params: list[FunctionParameter]):
         dto_path = create_if_missing(os.path.join(self.main_path, "DTO"))
         self.env.get_template("controllers/dto.template").stream({
-            "service_name": self.service.name, "header_comment": get_comment(),
             "name": name,
             "fields": [(p.type, p.name) for p in params]
         }).dump(os.path.join(dto_path, name+".cs"))
@@ -203,8 +195,6 @@ class ServiceGenerator:
 
         for s in self.service.dependencies:
             self.env.get_template("services/dependency_service.template").stream({
-                "service_name": self.service.name,
-                "header_comment": get_comment(),
                 "dependency_service_name": s.name,
                 "constructor_params": ', '.join([f'{first_upper(f.name)}Command {f.name}Command'
                                                  for f in fns_by_service[s.name]]),
@@ -223,15 +213,11 @@ class ServiceGenerator:
     def generate_controller(self):
         controller_path = create_if_missing(os.path.join(self.main_path, "Controllers"))
         self.env.get_template("controllers/controller.template").stream({
-            "service_name": self.service.name,
             "api": self.service.api,
-            "header_comment": get_comment(),
         }).dump(os.path.join(controller_path, self.service.name + "Controller.cs"))
 
     def generate_startup(self):
         self.env.get_template("startup.template").stream({
-            "service_name": self.service.name,
-            "header_comment": get_comment(),
             "": None,
         }).dump(os.path.join(self.main_path, "Startup.cs"))
 

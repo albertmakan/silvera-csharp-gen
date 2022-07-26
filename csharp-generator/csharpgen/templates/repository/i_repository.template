@@ -1,4 +1,4 @@
-/**{{header_comment}}*/
+/**{{header_comment()}}*/
 
 using System;
 using System.Collections.Generic;

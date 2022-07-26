@@ -1,4 +1,4 @@
-/**{{header_comment}}*/
+/**{{header_comment()}}*/
 
 using Confluent.Kafka;
 using {{service_name}}.Messaging.Messages;
