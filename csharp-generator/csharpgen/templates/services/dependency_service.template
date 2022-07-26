@@ -1,6 +1,7 @@
 /**{{header_comment()}}*/
 
 using {{service_name}}.Utils;
+using {{service_name}}.Models.Dependencies;
 using Steeltoe.CircuitBreaker.Hystrix;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -17,47 +18,57 @@ namespace {{service_name}}.Services.Dependencies
 
     public class {{dependency_service_name}}Client : I{{dependency_service_name}}Client
     {
-        {% for function in functions -%}
-        private readonly {{function.name|first_upper}}Command _{{function.name}}Command;
-        {% endfor %}
-        public {{dependency_service_name}}Client({{constructor_params}})
+        private readonly IHttpClientFactory _httpClientFactory;
+
+        public {{dependency_service_name}}Client(IHttpClientFactory httpClientFactory)
         {
-            {% for function in functions -%}
-            _{{function.name}}Command = {{function.name}}Command;
-            {% endfor %}
+            _httpClientFactory = httpClientFactory;
         }
         {% for function in functions %}
         public {{function.ret_type|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}})
         {
-            {% for param in function.params -%}
-            _{{function.name}}Command.{{param.name}} = {{param.name}};
-            {% endfor %}{{""-}}
-            return _{{function.name}}Command.Execute();
+            {{"" if function.ret_type == "void" else "return " -}}
+            new {{function.name|first_upper}}Command(_httpClientFactory)
+            {
+                {% for param in function.params %}{{param.name}} = {{param.name}}, {% endfor %}
+            }
+            .Execute();
         }
         {% endfor %}
     }
 
     {% for function in functions %}
-    public class {{function.name|first_upper}}Command : HystrixCommand<{{function.ret_type|convert_type}}>
+    public class {{function.name|first_upper}}Command : HystrixCommand<{{
+        "bool" if function.ret_type == "void" else function.ret_type|convert_type}}>
     {
         private readonly HttpClient _httpClient;
         {% for param in function.params -%}
         public {{param.type|convert_type}} {{param.name}} { get; set; }
         {% endfor %}
-        public {{function.name|first_upper}}Command(IHystrixCommandOptions options, IHttpClientFactory httpClientFactory) : base(options)
+        public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory)
+            : base(HystrixCommandGroupKeyDefault.AsKey("{{dependency_service_name}}Group"))
         {
             _httpClient = httpClientFactory.CreateClient("{{dependency_service_name}}");
         }
 
-        protected override async Task<{{function.ret_type|convert_type}}> RunAsync()
+        protected override async Task<{{
+            "bool" if function.ret_type == "void" else function.ret_type|convert_type}}> RunAsync()
         {
             var response = await _httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
             }}({{function.dep|request_uri_and_body}});
+            {% if function.ret_type == "void" -%}
+            return true;
+            {%- else -%}
             return await response.Content.ReadFromJsonAsync<{{function.ret_type|convert_type}}>();
+            {%- endif %}
         }
 
+        {% if function.ret_type == "void" -%}
+        protected override bool RunFallback() => false;
+        {%- else -%}
         protected override {{function.ret_type|convert_type}} RunFallback() => {{function|get_default_ret_val}};
+        {%- endif %}
     }
     {% endfor %}
 }

@@ -196,8 +196,6 @@ class ServiceGenerator:
         for s in self.service.dependencies:
             self.env.get_template("services/dependency_service.template").stream({
                 "dependency_service_name": s.name,
-                "constructor_params": ', '.join([f'{first_upper(f.name)}Command {f.name}Command'
-                                                 for f in fns_by_service[s.name]]),
                 "functions": fns_by_service[s.name],
                 "has_domain_dependencies": len(self.service.dep_typedefs) > 0,
                 "use_circuit_breaker": use_circuit_breaker,

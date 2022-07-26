@@ -52,9 +52,9 @@ CSHARP = {
         BOOL: "false",
         VOID: "",
         DATE: "System.DateTime.Now",
-        LIST: "null",
-        SET: "null",
-        DICT: "null"
+        LIST: "System.Collections.Generic.List",
+        SET: "System.Collections.Generic.HashSet",
+        DICT: "System.Collections.Generic.Dictionary",
     },
 
     "ASYNC_RET_TYPE": "System.Threading.Tasks.Task"
@@ -83,6 +83,14 @@ def convert_ret_type(func: Function):
 
 
 def get_default_ret_val(_type):
+    if isinstance(_type, TypeDef):
+        return "new ()"
+    if isinstance(_type, TypedList):
+        return f"new {CSHARP['DEF_RET_VAL'][LIST]}<{convert_type(_type.type)}>()"
+    if isinstance(_type, TypedSet):
+        return f"new {CSHARP['DEF_RET_VAL'][SET]}<{convert_type(_type.type)}>()"
+    if isinstance(_type, TypedDict):
+        return f"new {CSHARP['DEF_RET_VAL'][DICT]}<{convert_type(_type.key_type)}, {convert_type(_type.value_type)}>()"
     return CSHARP["DEF_RET_VAL"][_type]
 
 

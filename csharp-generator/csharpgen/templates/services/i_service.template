@@ -37,8 +37,5 @@ namespace {{service_name}}.Services.Base
         public void {{function.name}}(com.silvera.{{package_name}}.messages.{{msg_fqn}} message);
         {% endfor %}
         {% endfor %}
-
-        //todo for producer
-        void Publish(string paperId, string authorId);
     }
 }
