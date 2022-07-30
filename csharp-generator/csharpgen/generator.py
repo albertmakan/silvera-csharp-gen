@@ -4,7 +4,7 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
 from silvera.generator.registration import GeneratorDesc
-from silvera.core import ServiceDecl, Function, FunctionParameter
+from silvera.core import ServiceDecl, Function, FunctionParameter, MessageGroup, ConsumerAnnotation
 from silvera.const import *
 
 from csharpgen.type_converter import convert_type, convert_ret_type, get_default_for_cb_pattern
@@ -85,9 +85,12 @@ class ServiceGenerator:
             self.generate_message_producer()
         if self.service.consumes:
             self.generate_message_consumer()
+        self.generate_messages()
         self.generate_other_files()
         self.generate_controller()
-        self.generate_dependency_services()
+        if self.service.dependencies:
+            self.generate_dependency_services()
+        self.generate_service()
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
@@ -207,6 +210,25 @@ class ServiceGenerator:
         services_path = create_if_missing(os.path.join(self.main_path, "Services"))
         base_path = create_if_missing(os.path.join(services_path, "Base"))
         impl_path = create_if_missing(os.path.join(services_path, "Impl"))
+        msg_per_function, function_per_channel = consumer_f(self.service)
+
+        to_inject = [(f"I{t.name}Repository", f"{first_lower(t.name)}Repository") for t in self.service.api.typedefs]
+        to_inject.extend([(f"I{d.name}Client", f"{first_lower(d.name)}Client") for d in self.service.dependencies])
+        if self.service.produces:
+            to_inject.append(("IKafkaProducer", "kafkaProducer"))
+        self.service.uses_messaging
+        service_data = {
+            "service": self.service,
+            "to_inject": to_inject,
+            "constructor_params": ', '.join([f"{t} {name}" for t, name in to_inject]),
+            "function_per_channel": function_per_channel,
+            "msg_per_function": msg_per_function,
+        }
+        self.env.get_template("services/i_service.template").stream(service_data).dump(
+            os.path.join(base_path, f"I{self.service.name}Service.cs"))
+        impl_file = os.path.join(impl_path, f"{self.service.name}Service.cs")
+        #if not os.path.exists(impl_file):
+        self.env.get_template("services/service.template").stream(service_data).dump(impl_file)
 
     def generate_controller(self):
         controller_path = create_if_missing(os.path.join(self.main_path, "Controllers"))
@@ -222,13 +244,98 @@ class ServiceGenerator:
     def generate_settings(self):
         settings_path = create_if_missing(os.path.join(self.main_path, "Settings"))
 
+    def generate_messages(self):
+        msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
+        messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
+
+        def create_package(msg_group: MessageGroup, path: str, parent_ns="Messages"):
+            curr_path = create_if_missing(os.path.join(path, msg_group.name))
+            curr_ns = f"{parent_ns}.{msg_group.name}"
+            for msg in msg_group.messages:
+                self.env.get_template("messaging/message.template").stream({
+                    "namespace": curr_ns,
+                    "name": msg.name,
+                    "fqn": msg.fqn,
+                    "attributes": msg.fields
+                }).dump(os.path.join(curr_path, msg.name+".cs"))
+
+            for gr in msg_group.groups:
+                create_package(gr, curr_path, curr_ns)
+
+        for mg in self.service.parent.model.msg_pool.groups:
+            create_package(mg, messages_path)
+
+    def get_consumed_channels(self):
+        return {ch for v in self.service.consumes.values() for ch in v}
+
+    def check_messaging(self):
+        channels = {}
+        brokers = self.service.parent.model.msg_brokers
+        for mb in brokers:
+            for ch in brokers[mb].channels:
+                if ch in channels:
+                    raise Exception("Duplicate channel name found: ", ch)
+            channels.update(brokers[mb].channels)
+        print({ch.name: ch.msg_type.fqn for ch in channels.values()})
+        print(self.service.consumers_per_message)
+        print(self.service.f_consumers)
+        print(self.service.consumes)
+        print(consumer_f(self.service))
+        print("PRODUCES:", self.service.produces)
+
+        for m in self.service.consumes:
+            for ch in self.service.consumes[m]:
+                if ch.msg_type.fqn != m.fqn:
+                    raise Exception(f"{self.service.name}: Cannot consume message of type {m.fqn} from channel "
+                                    f"{ch.name}({ch.msg_type.fqn})")
+        for m in self.service.produces:
+            for ch in self.service.produces[m]:
+                if isinstance(ch, set):
+                    for ch1 in ch:
+                        if ch1.msg_type.fqn != m.fqn:
+                            raise Exception(f"{self.service.name}: Cannot produce message of type {m.fqn} to channel "
+                                            f"{ch1.name}({ch1.msg_type.fqn})")
+                    continue
+                if ch.msg_type.fqn != m.fqn:
+                    raise Exception(f"{self.service.name}: Cannot produce message of type {m.fqn} to channel "
+                                    f"{ch.name}({ch.msg_type.fqn})")
+
 
 def generate(service: ServiceDecl, output_dir, debug):
     print("Called C#!")
     print(service, output_dir)
     for d in service.dep_functions:
         print(d.name, d.ret_type)
-    ServiceGenerator(service, output_dir).generate()
+    sg = ServiceGenerator(service, output_dir)
+    sg.generate()
+
+    mpf, fpc = consumer_f(sg.service)
+    for ch in fpc:
+        print(F"_{ch.name}Consumer = new KafkaConsumer<{ch.msg_type.fqn}>('{ch.name}');")
+        for f in fpc[ch]:
+            print(F"_{ch.name}Consumer.AddListener({f});")
+        print()
+
+    for f in mpf:
+        for m in mpf[f]:
+            print(f"void {f}({m} {m.lower()})")
+        print()
+
+    sg.check_messaging()
+
+
+def consumer_f(service: ServiceDecl):
+    mpf, fpc = defaultdict(set), defaultdict(set)
+    internal = service.api.internal
+    if not internal:
+        return mpf, fpc
+    for f in internal.functions:
+        for ann in f.msg_annotations:
+            if isinstance(ann, ConsumerAnnotation):
+                for sub in ann.subscriptions:
+                    mpf[f.name].add(sub.channel.msg_type.fqn)
+                    fpc[sub.channel].add(f.name)
+    return mpf, fpc
 
 
 # Create C# generator.

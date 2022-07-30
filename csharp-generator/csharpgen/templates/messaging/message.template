@@ -1,0 +1,17 @@
+/**{{header_comment()}}*/
+
+using System.Text.Json;
+
+namespace {{service_name}}.Messaging.{{namespace}}
+{
+    public class {{name}} : IMessage
+    {
+        //{{fqn}}
+        {% for attr in attributes %}
+        public {{attr.type|convert_type}} {{attr.name|first_upper}} { get; set; }
+        {% endfor %}
+
+        public override string ToString() => JsonSerializer.Serialize(this);
+        public string ToJson() => ToString();
+    }
+}

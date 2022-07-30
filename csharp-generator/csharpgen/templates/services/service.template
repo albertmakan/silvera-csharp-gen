@@ -1,0 +1,113 @@
+/**{{header_comment()}}*/
+
+using {{service_name}}.Exceptions;
+{% if service.uses_messaging -%}
+using {{service_name}}.Messaging;
+{%- endif %}
+using {{service_name}}.Models;
+using {{service_name}}.Repository.Contracts;
+using {{service_name}}.Services.Base;
+{% if service.dependencies -%}
+using {{service_name}}.Services.Dependencies;
+{%- endif %}
+
+{%- macro crud_produces(typedef, op) %}
+    {%- if typedef.crud_dict[op] %}
+    {%- set message_fqn, channel_name, _ = typedef.crud_dict[op] %}
+            _kafkaProducer.Send("{{channel_name}}", new Messaging.Messages.{{message_fqn}}()
+            {
+                // Here set values to the message attributes
+            });
+    {%- endif %}
+{%- endmacro %}
+
+{%- macro function_produces(function) %}
+    {%- for message, channel in function.produces %}
+            _kafkaProducer.Send("{{channel.name}}", new Messaging.Messages.{{message.fqn}}()
+            {
+                // Here set values to the message attributes
+            });
+    {%- endfor %}
+{%- endmacro %}
+
+namespace {{service_name}}.Services.Impl
+{
+    public class {{service_name}}Service : I{{service_name}}Service
+    {
+        {%- for t, name in to_inject %}
+        private readonly {{t}} _{{name}};
+        {%- endfor %}
+        {%- for ch in function_per_channel %}
+        private readonly IKafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn}}> _{{ch.name}}Consumer;
+        {%- endfor %}
+
+        public {{service_name}}Service({{constructor_params}})
+        {
+            {%- for _, name in to_inject %}
+            _{{name}} = {{name}};
+            {%- endfor %}
+            {%- for ch in function_per_channel %}
+            _{{ch.name}}Consumer = new KafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn}}>("{{ch.name}}");
+            {%- for f in function_per_channel[ch] %}
+            _{{ch.name}}Consumer.AddListener({{f|first_upper}});
+            {%- endfor %}
+            {%- endfor %}
+        }
+
+        {%- for t in service.api.typedefs %}
+        {%- set id_datatype = "string" -%}
+        {% if t.crud_dict %}
+        public {{t.name}} Read{{t.name}}({{id_datatype}} id)
+        {
+            var {{t.name|lower}} = _{{t.name|first_lower}}Repository.FindById(id);
+            {{- crud_produces(t, "@read")}}
+            if ({{t.name|lower}} == null) throw new NotFoundException($"{{t.name}} with id '{id}' not found");
+            return {{t.name|lower}};
+        }
+        {%- endif %}
+        {% if "@create" in t.crud_dict %}
+        public {{t.name}} Create{{t.name}}({{t.name}} {{t.name|lower}})
+        {
+            _{{t.name|first_lower}}Repository.InsertOne({{t.name|lower}});
+            {{- crud_produces(t, "@create")}}
+            return {{t.name|lower}};
+        }
+        {%- endif %}
+        {% if "@update" in t.crud_dict %}
+        public {{t.name}} Update{{t.name}}({{t.name}} {{t.name|lower}}Update)
+        {
+            var {{t.name|lower}} = Read{{t.name}}({{t.name|lower}}Update.Id);
+            _{{t.name|first_lower}}Repository.ReplaceOne({{t.name|lower}}Update);
+            {{- crud_produces(t, "@update")}}
+            return {{t.name|lower}}Update;
+        }
+        {%- endif %}
+        {% if "@delete" in t.crud_dict %}
+        public void Delete{{t.name}}({{id_datatype}} id)
+        {
+            var {{t.name|lower}} = Read{{t.name}}(id);
+            _{{t.name|first_lower}}Repository.DeleteById(id);
+            {{- crud_produces(t, "@delete")}}
+        }
+        {%- endif %}
+        {%- endfor %}
+
+        {% for function in service.api.functions %}
+        public {{function|convert_ret_type}} {{function.name|first_upper}}({{function|unfold_function_params}})
+        {
+            // TODO: Implement this method
+            {{- function_produces(function) }}
+        }
+        {% endfor %}
+
+        {%- for func in msg_per_function %}
+        {% for msg_fqn in msg_per_function[func] %}
+        public void {{func|first_upper}}(Messaging.Messages.{{msg_fqn}} message)
+        {
+            // TODO: Implement this method
+            {{- function_produces(func) }}
+        }
+        {%- endfor %}
+        {%- endfor %}
+    }
+}
