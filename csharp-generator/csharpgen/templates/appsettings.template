@@ -1,0 +1,29 @@
+{
+  "$schema": "https://steeltoe.io/schema/latest/schema.json",
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+
+  "MongoDbSettings": {
+    "ConnectionString": "mongodb://localhost:27017",
+    "DatabaseName": "{{database_name}}"
+  },
+
+  "Eureka": {
+    "Instance": {
+      "AppName": "{{service_name|to_kebab}}",
+      "port": "{{port}}",
+      "ipAddress": "localhost",
+      "preferIpAddress": true
+    },
+    "Client": {
+      "EurekaServerServiceUrls": "http://localhost:9091/eureka",
+      "ShouldRegisterWithEureka": true
+    }
+  }
+}

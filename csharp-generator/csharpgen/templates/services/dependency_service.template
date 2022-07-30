@@ -48,7 +48,7 @@ namespace {{service_name}}.Services.Dependencies
         public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory)
             : base(HystrixCommandGroupKeyDefault.AsKey("{{dependency_service_name}}Group"))
         {
-            _httpClient = httpClientFactory.CreateClient("{{dependency_service_name}}");
+            _httpClient = httpClientFactory.CreateClient("{{dependency_service_name|to_kebab}}");
         }
 
         protected override async Task<{{

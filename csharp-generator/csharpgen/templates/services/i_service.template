@@ -1,36 +1,35 @@
 /**{{header_comment()}}*/
 
 using {{service_name}}.Models;
-using {{service_name}}.Messaging;
 
 namespace {{service_name}}.Services.Base
 {
     public interface I{{service_name}}Service
     {
-        {%- for t in typedefs %}
+        {%- for t in service.api.typedefs %}
         {%- set id_datatype = "string" -%}
-        {% if "@create" in t.crud_dict %}
+        {%- if "@create" in t.crud_dict %}
         {{t.name}} Create{{t.name}}({{t.name}} {{t.name|lower}});
         {%- endif %}
-        {% if "@update" in t.crud_dict %}
+        {%- if "@update" in t.crud_dict %}
         {{t.name}} Update{{t.name}}({{t.name}} {{t.name|lower}}Update);
         {%- endif %}
-        {% if "@read" in t.crud_dict %}
+        {%- if "@read" in t.crud_dict %}
         {{t.name}} Read{{t.name}}({{id_datatype}} id);
         {%- endif %}
-        {% if "@delete" in t.crud_dict %}
+        {%- if "@delete" in t.crud_dict %}
         void Delete{{t.name}}({{id_datatype}} id);
         {%- endif %}
-        {% endfor%}
+        {%- endfor%}
 
-        {% for function in functions %}
+        {%- for function in service.api.functions %}
         {{function|convert_ret_type}} {{function.name|first_upper}}({{function|unfold_function_params}});
-        {% endfor %}
+        {%- endfor %}
 
-        {% for func in msg_per_function %}
-        {% for msg_fqn in msg_per_function[func] %}
+        {%- for func in msg_per_function %}
+        {%- for msg_fqn in msg_per_function[func] %}
         void {{func|first_upper}}(Messaging.Messages.{{msg_fqn}} message);
-        {% endfor %}
-        {% endfor %}
+        {%- endfor %}
+        {%- endfor %}
     }
 }

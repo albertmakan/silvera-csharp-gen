@@ -97,6 +97,7 @@ namespace {{service_name}}.Services.Impl
         {
             // TODO: Implement this method
             {{- function_produces(function) }}
+            throw new System.NotImplementedException();
         }
         {% endfor %}
 
@@ -106,6 +107,7 @@ namespace {{service_name}}.Services.Impl
         {
             // TODO: Implement this method
             {{- function_produces(func) }}
+            throw new System.NotImplementedException();
         }
         {%- endfor %}
         {%- endfor %}

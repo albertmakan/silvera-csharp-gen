@@ -12,8 +12,9 @@ using Microsoft.OpenApi.Models;
 using MongoDB.Bson.Serialization.Conventions;
 using Steeltoe.Discovery.Client;
 using Steeltoe.Discovery.Eureka;
+{% if clients -%}
 using Steeltoe.Common.Http.Discovery;
-using Steeltoe.CircuitBreaker.Hystrix;
+{%- endif %}
 using System;
 using System.Text;
 
@@ -21,10 +22,7 @@ using {{service_name}}.Middleware;
 using {{service_name}}.Repository.Contracts;
 using {{service_name}}.Repository.Impl;
 using {{service_name}}.Services.Base;
-using {{service_name}}.Services.Impl;
-using {{service_name}}.Services.Dependencies;
 using {{service_name}}.Settings;
-using {{service_name}}.Messaging;
 
 namespace {{service_name}}
 {
@@ -43,8 +41,10 @@ namespace {{service_name}}
             services.AddDiscoveryClient(Configuration);
             services.AddServiceDiscovery(a => a.UseEureka());
 
-            // TODO
-            services.AddHttpClient("user", client => client.BaseAddress = new Uri("http://user-service/")).AddServiceDiscovery();
+            {%- for client in clients %}
+            services.AddHttpClient("{{client|to_kebab}}", client => client.BaseAddress = new Uri("http://{{client|to_kebab}}/"))
+                    .AddServiceDiscovery();
+            {%- endfor %}
 
             services.AddControllers();
             services.AddSwaggerGen(options =>
@@ -77,20 +77,21 @@ namespace {{service_name}}
                 serviceProvider.GetRequiredService<IOptions<MongoDbSettings>>().Value
             );
 
-            // TODO
-            services.AddHystrixCommand<GetNameCommand>("UserGroup", Configuration);
-
             // DI
             services.AddSingleton(typeof(IRepository<>), typeof(Repository<>));
+            {%- for repo in repositories %}
+            services.AddSingleton(typeof(I{{repo}}Repository), typeof({{repo}}Repository));
+            {%- endfor %}
 
-            // TODO
-            services.AddSingleton(typeof(IPaperRepository), typeof(PaperRepository));
+            {%- if producer_needed %}
+            services.AddSingleton(typeof(Messaging.IKafkaProducer), typeof(Messaging.KafkaProducer));
+            {%- endif %}
 
-            services.AddSingleton(typeof(IKafkaProducer), typeof(KafkaProducer));
+            {%- for client in clients %}
+            services.AddSingleton(typeof(Services.Dependencies.I{{client}}Client), typeof(Services.Dependencies.{{client}}Client));
+            {%- endfor %}
 
-            // TODO
-            services.AddSingleton(typeof(IUserClient), typeof(UserClient));
-            services.AddSingleton(typeof(I{{service_name}}Service), typeof({{service_name}}Service));
+            services.AddSingleton(typeof(I{{service_name}}Service), typeof(Services.Impl.{{service_name}}Service));
 
             // Uncomment for AUTHENTICATION:
             /**
@@ -142,9 +143,6 @@ namespace {{service_name}}
             app.UseAuthentication();
 
             app.UseAuthorization();
-
-            // TODO
-            app.UseHystrixRequestContext();
 
             app.UseEndpoints(endpoints =>
             {

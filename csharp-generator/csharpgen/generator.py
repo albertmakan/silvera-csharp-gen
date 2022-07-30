@@ -27,6 +27,10 @@ def first_lower(s: str):
     return s[0].lower() + s[1:]
 
 
+def to_kebab(s: str):
+    return s[0].lower() + ''.join(("-" + c.lower() if c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" else c for c in s[1:]))
+
+
 def param_names(func: Function):
     is_dto = len([p for p in func.params if not (p.url_placeholder or p.query_param)]) > 1
     return ", ".join(
@@ -64,6 +68,7 @@ class ServiceGenerator:
 
         env.filters["first_upper"] = first_upper
         env.filters["first_lower"] = first_lower
+        env.filters["to_kebab"] = to_kebab
         env.filters["convert_type"] = convert_type
         env.filters["convert_ret_type"] = convert_ret_type
         env.filters["unfold_function_params"] = \
@@ -79,6 +84,7 @@ class ServiceGenerator:
         return env
 
     def generate(self):
+        self.check_messaging()
         self.generate_model()
         self.generate_repositories()
         if self.service.produces:
@@ -91,6 +97,9 @@ class ServiceGenerator:
         if self.service.dependencies:
             self.generate_dependency_services()
         self.generate_service()
+        self.generate_startup()
+        self.generate_csproj()
+        self.generate_settings()
 
     def generate_model(self):
         models_path = create_if_missing(os.path.join(self.main_path, "Models"))
@@ -210,25 +219,25 @@ class ServiceGenerator:
         services_path = create_if_missing(os.path.join(self.main_path, "Services"))
         base_path = create_if_missing(os.path.join(services_path, "Base"))
         impl_path = create_if_missing(os.path.join(services_path, "Impl"))
-        msg_per_function, function_per_channel = consumer_f(self.service)
 
         to_inject = [(f"I{t.name}Repository", f"{first_lower(t.name)}Repository") for t in self.service.api.typedefs]
         to_inject.extend([(f"I{d.name}Client", f"{first_lower(d.name)}Client") for d in self.service.dependencies])
         if self.service.produces:
             to_inject.append(("IKafkaProducer", "kafkaProducer"))
-        self.service.uses_messaging
-        service_data = {
+        msg_per_function, function_per_channel = consumer_f(self.service)
+
+        self.env.get_template("services/i_service.template").stream({
+            "service": self.service, "msg_per_function": msg_per_function
+        }).dump(os.path.join(base_path, f"I{self.service.name}Service.cs"))
+        impl_file = os.path.join(impl_path, f"{self.service.name}Service.cs")
+        # if not os.path.exists(impl_file):
+        self.env.get_template("services/service.template").stream({
             "service": self.service,
             "to_inject": to_inject,
             "constructor_params": ', '.join([f"{t} {name}" for t, name in to_inject]),
             "function_per_channel": function_per_channel,
-            "msg_per_function": msg_per_function,
-        }
-        self.env.get_template("services/i_service.template").stream(service_data).dump(
-            os.path.join(base_path, f"I{self.service.name}Service.cs"))
-        impl_file = os.path.join(impl_path, f"{self.service.name}Service.cs")
-        #if not os.path.exists(impl_file):
-        self.env.get_template("services/service.template").stream(service_data).dump(impl_file)
+            "msg_per_function": msg_per_function
+        }).dump(impl_file)
 
     def generate_controller(self):
         controller_path = create_if_missing(os.path.join(self.main_path, "Controllers"))
@@ -238,11 +247,31 @@ class ServiceGenerator:
 
     def generate_startup(self):
         self.env.get_template("startup.template").stream({
-            "": None,
+            "producer_needed": bool(self.service.produces),
+            "repositories": [t.name for t in self.service.api.typedefs],
+            "clients": [c.name for c in self.service.dependencies]
         }).dump(os.path.join(self.main_path, "Startup.cs"))
+        self.env.get_template("program.template").stream({
+            "port": self.service.port
+        }).dump(os.path.join(self.main_path, "Program.cs"))
+
+    def generate_csproj(self):
+        self.env.get_template("csproj.template").stream({
+            "producer_needed": bool(self.service.produces),
+            "consumer_needed": bool(self.service.consumes),
+            "httpclient_needed": bool(self.service.dependencies)
+        }).dump(os.path.join(self.main_path, self.service.name+".csproj"))
 
     def generate_settings(self):
-        settings_path = create_if_missing(os.path.join(self.main_path, "Settings"))
+        self.env.get_template("settings/mongo_db_settings.template").stream().dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Settings")), "MongoDbSettings.cs"))
+        self.env.get_template("appsettings.template").stream({
+            "database_name": "test",
+            "port": self.service.port
+        }).dump(os.path.join(self.main_path, "appsettings.json"))
+        self.env.get_template("launchSettings.template").stream({
+            "port": self.service.port
+        }).dump(os.path.join(create_if_missing(os.path.join(self.main_path, "Properties")), "launchSettings.json"))
 
     def generate_messages(self):
         msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
@@ -265,9 +294,6 @@ class ServiceGenerator:
         for mg in self.service.parent.model.msg_pool.groups:
             create_package(mg, messages_path)
 
-    def get_consumed_channels(self):
-        return {ch for v in self.service.consumes.values() for ch in v}
-
     def check_messaging(self):
         channels = {}
         brokers = self.service.parent.model.msg_brokers
@@ -276,12 +302,6 @@ class ServiceGenerator:
                 if ch in channels:
                     raise Exception("Duplicate channel name found: ", ch)
             channels.update(brokers[mb].channels)
-        print({ch.name: ch.msg_type.fqn for ch in channels.values()})
-        print(self.service.consumers_per_message)
-        print(self.service.f_consumers)
-        print(self.service.consumes)
-        print(consumer_f(self.service))
-        print("PRODUCES:", self.service.produces)
 
         for m in self.service.consumes:
             for ch in self.service.consumes[m]:
@@ -303,25 +323,9 @@ class ServiceGenerator:
 
 def generate(service: ServiceDecl, output_dir, debug):
     print("Called C#!")
-    print(service, output_dir)
-    for d in service.dep_functions:
-        print(d.name, d.ret_type)
+    print(service, output_dir, debug)
     sg = ServiceGenerator(service, output_dir)
     sg.generate()
-
-    mpf, fpc = consumer_f(sg.service)
-    for ch in fpc:
-        print(F"_{ch.name}Consumer = new KafkaConsumer<{ch.msg_type.fqn}>('{ch.name}');")
-        for f in fpc[ch]:
-            print(F"_{ch.name}Consumer.AddListener({f});")
-        print()
-
-    for f in mpf:
-        for m in mpf[f]:
-            print(f"void {f}({m} {m.lower()})")
-        print()
-
-    sg.check_messaging()
 
 
 def consumer_f(service: ServiceDecl):
