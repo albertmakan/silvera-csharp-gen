@@ -4,7 +4,6 @@ using {{service_name}}.Exceptions;
 {% if service.uses_messaging -%}
 using {{service_name}}.Messaging;
 {%- endif %}
-using {{service_name}}.Models;
 using {{service_name}}.Repository.Contracts;
 using {{service_name}}.Services.Base;
 {% if service.dependencies -%}
@@ -56,8 +55,9 @@ namespace {{service_name}}.Services.Impl
 
         {%- for t in service.api.typedefs %}
         {%- set id_datatype = "string" -%}
+        {%- set typename = as_type(t.name) -%}
         {% if t.crud_dict %}
-        public {{t.name}} Read{{t.name}}({{id_datatype}} id)
+        public {{typename}} Read{{t.name}}({{id_datatype}} id)
         {
             var {{t.name|lower}} = _{{t.name|first_lower}}Repository.FindById(id);
             {{- crud_produces(t, "@read")}}
@@ -66,7 +66,7 @@ namespace {{service_name}}.Services.Impl
         }
         {%- endif %}
         {% if "@create" in t.crud_dict %}
-        public {{t.name}} Create{{t.name}}({{t.name}} {{t.name|lower}})
+        public {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}})
         {
             _{{t.name|first_lower}}Repository.InsertOne({{t.name|lower}});
             {{- crud_produces(t, "@create")}}
@@ -74,7 +74,7 @@ namespace {{service_name}}.Services.Impl
         }
         {%- endif %}
         {% if "@update" in t.crud_dict %}
-        public {{t.name}} Update{{t.name}}({{t.name}} {{t.name|lower}}Update)
+        public {{typename}} Update{{t.name}}({{typename}} {{t.name|lower}}Update)
         {
             var {{t.name|lower}} = Read{{t.name}}({{t.name|lower}}Update.Id);
             _{{t.name|first_lower}}Repository.ReplaceOne({{t.name|lower}}Update);
@@ -93,7 +93,7 @@ namespace {{service_name}}.Services.Impl
         {%- endfor %}
 
         {% for function in service.api.functions %}
-        public {{function|convert_ret_type}} {{function.name|first_upper}}({{function|unfold_function_params}})
+        public {{function|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}})
         {
             // TODO: Implement this method
             {{- function_produces(function) }}

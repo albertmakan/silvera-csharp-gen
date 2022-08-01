@@ -4,10 +4,10 @@ from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
 from silvera.generator.registration import GeneratorDesc
-from silvera.core import ServiceDecl, Function, FunctionParameter, MessageGroup, ConsumerAnnotation
+from silvera.core import ServiceDecl, Function, FunctionParameter, MessageGroup, ConsumerAnnotation, TypeDef
 from silvera.const import *
 
-from csharpgen.type_converter import convert_type, convert_ret_type, get_default_for_cb_pattern
+from csharpgen.type_converter import convert_type, get_default_for_cb_pattern, DEP_NS
 from csharpgen.utils import get_templates_path
 from csharpgen.project_struct import create_if_missing, csharp_struct
 
@@ -40,43 +40,50 @@ def param_names(func: Function):
 
 def request_uri_and_body(func: Function):
     query_params, from_body = [], []
+    path = str(func.rest_path.split("?")[0])
     post_or_put = func.http_verb == HTTP_POST or func.http_verb == HTTP_PUT
     for p in func.params:
         if p.query_param:
             query_params.append(p.name)
         elif p.url_placeholder:
-            continue
+            path = path.replace(f"{{{p.name}}}", f"{{p.{first_upper(p.name)}}}")
         elif post_or_put:
-            from_body.append(p.name)
+            from_body.append(f"p.{first_upper(p.name)}")
         else:
             query_params.append(p.name)
-    query_params_str = '?'+'&'.join([f'{{{n}.ToQueryString("{n}")}}' for n in query_params])
+    query_params_str = '?'+'&'.join([f'{{p.{first_upper(n)}.ToQueryString("{n}")}}' for n in query_params])
     from_body_str = from_body[0] if len(from_body) == 1 else f'new {{ {", ".join(from_body)} }}'
-    request_uri = f'$"{func.rest_path.split("?")[0]}{query_params_str if query_params else ""}"'
+    request_uri = f'$"{path}{query_params_str if query_params else ""}"'
     return f'{request_uri}, {from_body_str}' if post_or_put else request_uri
 
 
 class ServiceGenerator:
     def __init__(self, service: ServiceDecl, output_dir):
         self.service = service
-        self.templates_path = get_templates_path()
         self.env = self._init_env()
         self.main_path = csharp_struct(output_dir, service.name)
 
     def _init_env(self):
-        env = Environment(loader=FileSystemLoader(self.templates_path))
+        env = Environment(loader=FileSystemLoader(get_templates_path()))
 
         env.filters["first_upper"] = first_upper
         env.filters["first_lower"] = first_lower
         env.filters["to_kebab"] = to_kebab
+        env.filters["convert_type_in_model"] = lambda t: convert_type(t, "")
         env.filters["convert_type"] = convert_type
-        env.filters["convert_ret_type"] = convert_ret_type
+        env.filters["convert_dep_type"] = lambda t: convert_type(t, DEP_NS)
         env.filters["unfold_function_params"] = \
             lambda f: ', '.join([f"{convert_type(p.type)} {p.name}" for p in f.params])
+        env.filters["unfold_dep_function_params"] = \
+            lambda f: ', '.join([f"{convert_type(p.type, DEP_NS)} {p.name}" for p in f.params])
+        env.filters["unfold_record_params"] = \
+            lambda f: ', '.join([f"{convert_type(p.type, DEP_NS)} {first_upper(p.name)}"
+                                 for p in f.params])
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
         env.filters["param_names"] = param_names
         env.filters["get_default_ret_val"] = get_default_for_cb_pattern
         env.filters["request_uri_and_body"] = request_uri_and_body
+        env.globals["as_type"] = lambda t: "Models."+t
 
         env.globals["service_name"] = self.service.name
         env.globals["header_comment"] = get_comment
@@ -106,6 +113,7 @@ class ServiceGenerator:
         self.env.get_template("models/document.template").stream().dump(os.path.join(models_path, "IDocument.cs"))
 
         for typedef in self.service.api.typedefs:
+            typedef.name = first_upper(typedef.name)
             id_attr = None
             for attr in typedef.fields:
                 if attr.isid:
@@ -117,11 +125,19 @@ class ServiceGenerator:
                 "id_attr": id_attr,
             }).dump(os.path.join(models_path, typedef.name + ".cs"))
 
-        if not self.service.dep_typedefs:
+        dep_typedefs = self.service.dep_typedefs
+        for df in self.service.dep_functions:
+            for p in df.params:
+                if isinstance(p.type, TypeDef):
+                    dep_typedefs.append(p.type)
+                    # TODO typedef in list
+
+        if not dep_typedefs:
             return
         dependencies_path = create_if_missing(os.path.join(models_path, "Dependencies"))
 
-        for typedef in self.service.dep_typedefs:
+        for typedef in dep_typedefs:
+            typedef.name = first_upper(typedef.name)
             self.env.get_template("models/dataclass.template").stream({
                 "dependency": True,
                 "name": typedef.name,
@@ -205,13 +221,15 @@ class ServiceGenerator:
                 use_circuit_breaker = True
             fns_by_service[fn.service_name].append(fn)
 
+        self.env.get_template("utils/url_helpers.template").stream().dump(
+            os.path.join(create_if_missing(os.path.join(self.main_path, "Utils")), "UrlHelpers.cs"))
         for s in self.service.dependencies:
             self.env.get_template("services/dependency_service.template").stream({
                 "dependency_service_name": s.name,
                 "functions": fns_by_service[s.name],
                 "has_domain_dependencies": len(self.service.dep_typedefs) > 0,
                 "use_circuit_breaker": use_circuit_breaker,
-                "uses_registry": True if s.service_registry else False,
+                "uses_registry": bool(s.service_registry),
                 "service_url": f"{s.url}:{s.port}"
             }).dump(os.path.join(dep_path, s.name + "Client.cs"))
 

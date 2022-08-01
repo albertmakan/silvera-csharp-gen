@@ -60,37 +60,43 @@ CSHARP = {
     "ASYNC_RET_TYPE": "System.Threading.Tasks.Task"
 }
 
-
-def convert_type(_type):
-    """Converts complex silvera object to a c# type"""
-    if isinstance(_type, TypeDef):
-        return _type.name
-    if isinstance(_type, TypedList):
-        return f"{CSHARP['COLLECTIONS'][LIST]}<{convert_type(_type.type)}>"
-    if isinstance(_type, TypedSet):
-        return f"{CSHARP['COLLECTIONS'][SET]}<{convert_type(_type.type)}>"
-    if isinstance(_type, TypedDict):
-        return f"{CSHARP['COLLECTIONS'][DICT]}<{convert_type(_type.key_type)}, {convert_type(_type.value_type)}>"
-    return CSHARP["TYPES"][_type]
+MODELS_NS = "Models."
+DEP_NS = MODELS_NS+"Dependencies."
 
 
-def convert_ret_type(func: Function):
-    if func.is_async():
-        if func.ret_type == VOID:
-            return CSHARP['ASYNC_RET_TYPE']
-        return f"{CSHARP['ASYNC_RET_TYPE']}<{convert_type(func.ret_type)}>"
-    return convert_type(func.ret_type)
+def convert_type(_type, prefix=MODELS_NS):
+    def _convert_type(_type):
+        """Converts complex silvera object to a c# type"""
+        if isinstance(_type, Function):
+            func = _type
+            if func.is_async():
+                if func.ret_type == VOID:
+                    return CSHARP['ASYNC_RET_TYPE']
+                return f"{CSHARP['ASYNC_RET_TYPE']}<{_convert_type(func.ret_type)}>"
+            return _convert_type(func.ret_type)
+        if isinstance(_type, TypeDef):
+            return prefix + _type.name
+        if isinstance(_type, TypedList):
+            return f"{CSHARP['COLLECTIONS'][LIST]}<{_convert_type(_type.type)}>"
+        if isinstance(_type, TypedSet):
+            return f"{CSHARP['COLLECTIONS'][SET]}<{_convert_type(_type.type)}>"
+        if isinstance(_type, TypedDict):
+            return f"{CSHARP['COLLECTIONS'][DICT]}<{_convert_type(_type.key_type)}, {_convert_type(_type.value_type)}>"
+        return CSHARP["TYPES"][_type]
+
+    return _convert_type(_type)
 
 
 def get_default_ret_val(_type):
     if isinstance(_type, TypeDef):
-        return "new ()"
+        return "new()"
     if isinstance(_type, TypedList):
-        return f"new {CSHARP['DEF_RET_VAL'][LIST]}<{convert_type(_type.type)}>()"
+        return f"new {CSHARP['DEF_RET_VAL'][LIST]}<{convert_type(_type.type, DEP_NS)}>()"
     if isinstance(_type, TypedSet):
-        return f"new {CSHARP['DEF_RET_VAL'][SET]}<{convert_type(_type.type)}>()"
+        return f"new {CSHARP['DEF_RET_VAL'][SET]}<{convert_type(_type.type, DEP_NS)}>()"
     if isinstance(_type, TypedDict):
-        return f"new {CSHARP['DEF_RET_VAL'][DICT]}<{convert_type(_type.key_type)}, {convert_type(_type.value_type)}>()"
+        return f"new {CSHARP['DEF_RET_VAL'][DICT]}" \
+               f"<{convert_type(_type.key_type, DEP_NS)}, {convert_type(_type.value_type, DEP_NS)}>()"
     return CSHARP["DEF_RET_VAL"][_type]
 
 

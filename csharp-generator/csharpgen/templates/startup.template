@@ -42,7 +42,7 @@ namespace {{service_name}}
             services.AddServiceDiscovery(a => a.UseEureka());
 
             {%- for client in clients %}
-            services.AddHttpClient("{{client|to_kebab}}", client => client.BaseAddress = new Uri("http://{{client|to_kebab}}/"))
+            services.AddHttpClient("{{client}}", client => client.BaseAddress = new Uri("http://{{client}}/"))
                     .AddServiceDiscovery();
             {%- endfor %}
 

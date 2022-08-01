@@ -8,7 +8,7 @@ namespace {{service_name}}.Models{{".Dependencies" if dependency else ""}}
     {
         {% for attr in attributes %}
         {%- if attr.required %}[Required]{%- endif %}
-        public {{attr.type|convert_type}} {{attr.name|first_upper}} { get; set; }
+        public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
         {% endfor %}
     }
 }

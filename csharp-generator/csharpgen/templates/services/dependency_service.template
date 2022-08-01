@@ -1,7 +1,6 @@
 /**{{header_comment()}}*/
 
 using {{service_name}}.Utils;
-using {{service_name}}.Models.Dependencies;
 using Steeltoe.CircuitBreaker.Hystrix;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -12,7 +11,7 @@ namespace {{service_name}}.Services.Dependencies
     public interface I{{dependency_service_name}}Client
     {
         {% for function in functions -%}
-        {{function.ret_type|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}});
+        {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}});
         {% endfor %}
     }
 
@@ -25,34 +24,31 @@ namespace {{service_name}}.Services.Dependencies
             _httpClientFactory = httpClientFactory;
         }
         {% for function in functions %}
-        public {{function.ret_type|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}})
+        public {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}})
         {
             {{"" if function.ret_type == "void" else "return " -}}
-            new {{function.name|first_upper}}Command(_httpClientFactory)
-            {
-                {% for param in function.params %}{{param.name}} = {{param.name}}, {% endfor %}
-            }
-            .Execute();
+            new {{function.name|first_upper}}Command(_httpClientFactory, new({{function.dep|param_names}})).Execute();
         }
         {% endfor %}
     }
 
     {% for function in functions %}
     public class {{function.name|first_upper}}Command : HystrixCommand<{{
-        "bool" if function.ret_type == "void" else function.ret_type|convert_type}}>
+        "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}>
     {
         private readonly HttpClient _httpClient;
-        {% for param in function.params -%}
-        public {{param.type|convert_type}} {{param.name}} { get; set; }
-        {% endfor %}
-        public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory)
+        public record struct Params({{function|unfold_record_params}});
+        private Params p;
+
+        public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory, Params @params)
             : base(HystrixCommandGroupKeyDefault.AsKey("{{dependency_service_name}}Group"))
         {
-            _httpClient = httpClientFactory.CreateClient("{{dependency_service_name|to_kebab}}");
+            _httpClient = httpClientFactory.CreateClient("{{dependency_service_name}}");
+            p = @params;
         }
 
         protected override async Task<{{
-            "bool" if function.ret_type == "void" else function.ret_type|convert_type}}> RunAsync()
+            "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}> RunAsync()
         {
             var response = await _httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
@@ -60,14 +56,14 @@ namespace {{service_name}}.Services.Dependencies
             {% if function.ret_type == "void" -%}
             return true;
             {%- else -%}
-            return await response.Content.ReadFromJsonAsync<{{function.ret_type|convert_type}}>();
+            return await response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>();
             {%- endif %}
         }
 
         {% if function.ret_type == "void" -%}
         protected override bool RunFallback() => false;
         {%- else -%}
-        protected override {{function.ret_type|convert_type}} RunFallback() => {{function|get_default_ret_val}};
+        protected override {{function.ret_type|convert_dep_type}} RunFallback() => {{function|get_default_ret_val}};
         {%- endif %}
     }
     {% endfor %}
