@@ -16,14 +16,14 @@
 
   "Eureka": {
     "Instance": {
-      "AppName": "{{service_name|to_kebab}}",
+      "AppName": "{{service_name}}",
       "port": "{{port}}",
       "ipAddress": "localhost",
       "preferIpAddress": true
     },
     "Client": {
-      "EurekaServerServiceUrls": "http://localhost:9091/eureka",
-      "ShouldRegisterWithEureka": true
+      "EurekaServerServiceUrls": "{{registry_url}}:{{registry_port}}/eureka",
+      "ShouldRegisterWithEureka": {{"true" if should_register else "false"}}
     }
   }
 }

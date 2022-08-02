@@ -6,9 +6,9 @@ namespace {{service_name}}.Models{{".Dependencies" if dependency else ""}}
 {
     public class {{name}} : Document
     {
-        {% for attr in attributes %}
-        {%- if attr.required %}[Required]{%- endif %}
+        {%- for attr in attributes %}
+        {% if attr.required %}[Required]{% endif %}
         public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
-        {% endfor %}
+        {%- endfor %}
     }
 }

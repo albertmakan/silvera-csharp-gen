@@ -2,7 +2,6 @@
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using {{service_name}}.DTO;
 using {{service_name}}.Filters;
 using {{service_name}}.Services.Base;
 
@@ -19,8 +18,8 @@ namespace {{service_name}}.Controllers
         {
             _{{service_name|first_lower}}Service = {{service_name|first_lower}}Service;
         }
-
-        {%- for t in api.typedefs %}
+        {% for t in api.typedefs -%}
+        {%- set id_datatype = "string" -%}
         {%- set typename = as_type(t.name) -%}
         {% if "@create" in t.crud_dict %}
         [HttpPost("{{t.name|lower}}")]
@@ -31,21 +30,21 @@ namespace {{service_name}}.Controllers
         {%- endif %}
         {% if "@read" in t.crud_dict %}
         [HttpGet("{{t.name|lower}}/{id}")]
-        public {{typename}} Read{{t.name}}(string id)
+        public {{typename}} Read{{t.name}}({{id_datatype}} id)
         {
             return _{{service_name|first_lower}}Service.Read{{t.name}}(id);
         }
         {%- endif %}
         {% if "@update" in t.crud_dict %}
         [HttpPut("{{t.name|lower}}/{id}")]
-        public {{typename}} Update{{t.name}}(string id, {{typename}} {{t.name|lower}}Update)
+        public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
         {
             return _{{service_name|first_lower}}Service.Update{{t.name}}({{t.name|lower}}Update);
         }
         {%- endif %}
         {% if "@delete" in t.crud_dict %}
         [HttpDelete("{{t.name|lower}}/{id}")]
-        public void Delete{{t.name}}(string id)
+        public void Delete{{t.name}}({{id_datatype}} id)
         {
             _{{service_name|first_lower}}Service.Delete{{t.name}}(id);
         }

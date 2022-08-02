@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 
 def get_root_path():
@@ -10,3 +11,7 @@ def get_root_path():
 def get_templates_path():
     """Returns the path to the templates folder."""
     return os.path.join(get_root_path(), "csharpgen", "templates")
+
+
+def create_backup_file(file_path):
+    os.rename(file_path, f"{file_path}{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")

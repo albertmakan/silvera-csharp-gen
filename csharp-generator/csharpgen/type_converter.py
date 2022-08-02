@@ -109,10 +109,8 @@ def get_default_for_cb_pattern(func: Function):
         else:
             return get_default_ret_val(func.ret_type)
     elif func.cb_pattern == "fail_silent":
-        warnings.warn("Circuit Breaker pattern 'fail_silent' returns "
-                      "default value instead of empty response. Sorry :(. ")
+        warnings.warn("Circuit Breaker pattern 'fail_silent' returns default value instead of empty response.")
         return get_default_ret_val(func.ret_type)
     elif func.cb_pattern == "fallback_cache":
-        warnings.warn("Circuit Breaker pattern 'fallback_cache' returns "
-                      "default value instead of cached value. Sorry :(. ")
+        warnings.warn("Circuit Breaker pattern 'fallback_cache' returns default value instead of cached value.")
         return get_default_ret_val(func.ret_type)

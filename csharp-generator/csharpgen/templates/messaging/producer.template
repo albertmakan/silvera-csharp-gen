@@ -21,9 +21,7 @@ namespace {{service_name}}.Messaging
             {
                 try
                 {
-                    return producer.ProduceAsync(topic, new Message<Null, string> { Value = message.ToJson() })
-                        .GetAwaiter()
-                        .GetResult();
+                    return producer.ProduceAsync(topic, new Message<Null, string> { Value = message.ToJson() });
                 }
                 catch (Exception e)
                 {

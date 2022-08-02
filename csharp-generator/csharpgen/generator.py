@@ -1,14 +1,16 @@
 import os
+import warnings
 from collections import defaultdict
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 
 from silvera.generator.registration import GeneratorDesc
-from silvera.core import ServiceDecl, Function, FunctionParameter, MessageGroup, ConsumerAnnotation, TypeDef
+from silvera.core import ServiceDecl, Function, FunctionParameter, MessageGroup, ConsumerAnnotation, \
+    TypeDef, TypedList, TypedSet, TypedDict
 from silvera.const import *
 
 from csharpgen.type_converter import convert_type, get_default_for_cb_pattern, DEP_NS
-from csharpgen.utils import get_templates_path
+from csharpgen.utils import get_templates_path, create_backup_file
 from csharpgen.project_struct import create_if_missing, csharp_struct
 
 
@@ -38,7 +40,7 @@ def param_names(func: Function):
          else "request."+first_upper(p.name) for p in func.params])
 
 
-def request_uri_and_body(func: Function):
+def request_uri_and_body(func: Function, from_record=False):
     query_params, from_body = [], []
     path = str(func.rest_path.split("?")[0])
     post_or_put = func.http_verb == HTTP_POST or func.http_verb == HTTP_PUT
@@ -46,12 +48,14 @@ def request_uri_and_body(func: Function):
         if p.query_param:
             query_params.append(p.name)
         elif p.url_placeholder:
-            path = path.replace(f"{{{p.name}}}", f"{{p.{first_upper(p.name)}}}")
+            if from_record:
+                path = path.replace(f"{{{p.name}}}", f"{{p.{first_upper(p.name)}}}")
         elif post_or_put:
-            from_body.append(f"p.{first_upper(p.name)}")
+            from_body.append(f"p.{first_upper(p.name)}" if from_record else p.name)
         else:
             query_params.append(p.name)
-    query_params_str = '?'+'&'.join([f'{{p.{first_upper(n)}.ToQueryString("{n}")}}' for n in query_params])
+    query_params_str = '?'+'&'.join([f'{{{f"p.{first_upper(n)}" if from_record else n}.ToQueryString("{n}")}}'
+                                     for n in query_params])
     from_body_str = from_body[0] if len(from_body) == 1 else f'new {{ {", ".join(from_body)} }}'
     request_uri = f'$"{path}{query_params_str if query_params else ""}"'
     return f'{request_uri}, {from_body_str}' if post_or_put else request_uri
@@ -82,7 +86,7 @@ class ServiceGenerator:
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
         env.filters["param_names"] = param_names
         env.filters["get_default_ret_val"] = get_default_for_cb_pattern
-        env.filters["request_uri_and_body"] = request_uri_and_body
+        env.globals["request_uri_and_body"] = request_uri_and_body
         env.globals["as_type"] = lambda t: "Models."+t
 
         env.globals["service_name"] = self.service.name
@@ -124,13 +128,30 @@ class ServiceGenerator:
                 "attributes": typedef.fields,
                 "id_attr": id_attr,
             }).dump(os.path.join(models_path, typedef.name + ".cs"))
+            if typedef.inherits:
+                warnings.warn("Inheritance is not supported yet.")
+
+        def recurse_typedef(_type, visited=None):
+            """Find all types that the current service will depend upon"""
+            if visited is None:
+                visited = set()
+            if _type in visited:
+                return visited
+            if isinstance(_type, TypeDef):
+                visited.add(_type)
+                for field in _type.fields:
+                    recurse_typedef(field.type, visited)
+            elif isinstance(_type, (TypedList, TypedSet)):
+                recurse_typedef(_type.type, visited)
+            elif isinstance(_type, TypedDict):
+                recurse_typedef(_type.key_type, visited)
+                recurse_typedef(_type.value_type, visited)
+            return visited
 
         dep_typedefs = self.service.dep_typedefs
         for df in self.service.dep_functions:
             for p in df.params:
-                if isinstance(p.type, TypeDef):
-                    dep_typedefs.append(p.type)
-                    # TODO typedef in list
+                dep_typedefs.extend(recurse_typedef(p.type))
 
         if not dep_typedefs:
             return
@@ -153,6 +174,8 @@ class ServiceGenerator:
         self.env.get_template("repository/repository.template").stream().dump(
             os.path.join(impl_path, "Repository.cs"))
         for typedef in self.service.api.typedefs:
+            if not typedef.crud_dict:
+                continue
             d = {"typedef": typedef.name}
             self.env.get_template("repository/iX_repository.template").stream(d).dump(
                 os.path.join(base_path, f"I{typedef.name}Repository.cs"))
@@ -197,7 +220,7 @@ class ServiceGenerator:
                 p.query_param = True
         if len(from_body) > 1:
             dto = self.generate_dto(first_upper(func.name)+"Request", from_body)
-            params.append(f"[FromBody] {dto} request")
+            params.append(f"[FromBody] DTO.{dto} request")
         elif from_body:
             params.append(f"[FromBody] {convert_type(from_body[0].type)} {from_body[0].name}")
         return ", ".join(params)
@@ -230,7 +253,7 @@ class ServiceGenerator:
                 "has_domain_dependencies": len(self.service.dep_typedefs) > 0,
                 "use_circuit_breaker": use_circuit_breaker,
                 "uses_registry": bool(s.service_registry),
-                "service_url": f"{s.url}:{s.port}"
+                "service_url": f"{s.url}:{s.port}/"
             }).dump(os.path.join(dep_path, s.name + "Client.cs"))
 
     def generate_service(self):
@@ -238,7 +261,8 @@ class ServiceGenerator:
         base_path = create_if_missing(os.path.join(services_path, "Base"))
         impl_path = create_if_missing(os.path.join(services_path, "Impl"))
 
-        to_inject = [(f"I{t.name}Repository", f"{first_lower(t.name)}Repository") for t in self.service.api.typedefs]
+        to_inject = [(f"I{t.name}Repository", f"{first_lower(t.name)}Repository") for t in self.service.api.typedefs
+                     if t.crud_dict]
         to_inject.extend([(f"I{d.name}Client", f"{first_lower(d.name)}Client") for d in self.service.dependencies])
         if self.service.produces:
             to_inject.append(("IKafkaProducer", "kafkaProducer"))
@@ -247,8 +271,10 @@ class ServiceGenerator:
         self.env.get_template("services/i_service.template").stream({
             "service": self.service, "msg_per_function": msg_per_function
         }).dump(os.path.join(base_path, f"I{self.service.name}Service.cs"))
+
         impl_file = os.path.join(impl_path, f"{self.service.name}Service.cs")
-        # if not os.path.exists(impl_file):
+        if os.path.exists(impl_file):
+            create_backup_file(impl_file)
         self.env.get_template("services/service.template").stream({
             "service": self.service,
             "to_inject": to_inject,
@@ -283,32 +309,37 @@ class ServiceGenerator:
     def generate_settings(self):
         self.env.get_template("settings/mongo_db_settings.template").stream().dump(
             os.path.join(create_if_missing(os.path.join(self.main_path, "Settings")), "MongoDbSettings.cs"))
+        should_register = bool(self.service.service_registry)
         self.env.get_template("appsettings.template").stream({
             "database_name": "test",
-            "port": self.service.port
+            "port": self.service.port,
+            "registry_url": self.service.service_registry.url if should_register else '',
+            "registry_port": self.service.service_registry.port if should_register else '',
+            "should_register": should_register
         }).dump(os.path.join(self.main_path, "appsettings.json"))
         self.env.get_template("launchSettings.template").stream({
             "port": self.service.port
         }).dump(os.path.join(create_if_missing(os.path.join(self.main_path, "Properties")), "launchSettings.json"))
 
     def generate_messages(self):
-        msg_path = create_if_missing(os.path.join(self.main_path, "Messaging"))
-        messages_path = create_if_missing(os.path.join(msg_path, "Messages"))
+        messages = set(self.service.produces.keys())
+        messages.update(self.service.consumes.keys())
+        if not messages:
+            return
 
         def create_package(msg_group: MessageGroup, path: str, parent_ns="Messages"):
             curr_path = create_if_missing(os.path.join(path, msg_group.name))
             curr_ns = f"{parent_ns}.{msg_group.name}"
             for msg in msg_group.messages:
-                self.env.get_template("messaging/message.template").stream({
-                    "namespace": curr_ns,
-                    "name": msg.name,
-                    "fqn": msg.fqn,
-                    "attributes": msg.fields
-                }).dump(os.path.join(curr_path, msg.name+".cs"))
-
+                if msg in messages:
+                    self.env.get_template("messaging/message.template").stream({
+                        "namespace": curr_ns, "message": msg
+                    }).dump(os.path.join(curr_path, msg.name+".cs"))
             for gr in msg_group.groups:
                 create_package(gr, curr_path, curr_ns)
 
+        messages_path = create_if_missing(os.path.join(
+            create_if_missing(os.path.join(self.main_path, "Messaging")), "Messages"))
         for mg in self.service.parent.model.msg_pool.groups:
             create_package(mg, messages_path)
 
