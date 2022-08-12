@@ -3,7 +3,6 @@
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Net;
-using System.Text.Json;
 using System.Threading.Tasks;
 using {{service_name}}.Exceptions;
 
@@ -32,19 +31,15 @@ namespace {{service_name}}.Middleware
         private static Task HandleResponseBasedOnException(HttpContext context, Exception exception)
         {
             context.Response.ContentType = "application/json";
-            context.Response.StatusCode = exception switch
+            context.Response.StatusCode = (int)(exception switch
             {
-                NotFoundException => (int)HttpStatusCode.NotFound,
-                BadLogicException => (int)HttpStatusCode.BadRequest,
-                ForbiddenException => (int)HttpStatusCode.Forbidden,
-                UnauthorizedException => (int)HttpStatusCode.Unauthorized,
-                _ => (int)HttpStatusCode.InternalServerError,
-            };
-            var responseModel = new BaseApiResponse(context.Response.StatusCode, exception.Message);
-            var result = JsonSerializer.Serialize(responseModel);
-            return context.Response.WriteAsync(result);
+                NotFoundException => HttpStatusCode.NotFound,
+                BadLogicException => HttpStatusCode.BadRequest,
+                ForbiddenException => HttpStatusCode.Forbidden,
+                UnauthorizedException => HttpStatusCode.Unauthorized,
+                _ => HttpStatusCode.InternalServerError,
+            });
+            return context.Response.WriteAsJsonAsync(new { context.Response.StatusCode, exception.Message });
         }
     }
-
-    internal record struct BaseApiResponse(int StatusCode, string Message);
 }

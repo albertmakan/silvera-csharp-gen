@@ -73,9 +73,7 @@ namespace {{service_name}}
             });
 
             services.Configure<MongoDbSettings>(Configuration.GetSection("MongoDbSettings"));
-            services.AddSingleton<IMongoDbSettings>(serviceProvider =>
-                serviceProvider.GetRequiredService<IOptions<MongoDbSettings>>().Value
-            );
+            services.AddSingleton<IMongoDbSettings>(p => p.GetRequiredService<IOptions<MongoDbSettings>>().Value);
 
             // DI
             services.AddSingleton(typeof(IRepository<>), typeof(Repository<>));

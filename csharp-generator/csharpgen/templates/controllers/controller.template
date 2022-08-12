@@ -57,7 +57,7 @@ namespace {{service_name}}.Controllers
         {
             {{"" if function.ret_type == "void" else "return " -}}
             {{"await " if function.is_async() else "" -}}
-            _{{service_name|first_lower}}Service.{{function.name|first_upper}}({{function|param_names}});
+            _{{service_name|first_lower}}Service.{{function.name|first_upper}}({{function|param_names_controller}});
         }
         {% endfor %}
     }

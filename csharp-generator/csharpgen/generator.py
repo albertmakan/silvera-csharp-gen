@@ -33,14 +33,14 @@ def to_kebab(s: str):
     return s[0].lower() + ''.join(("-" + c.lower() if c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" else c for c in s[1:]))
 
 
-def param_names(func: Function):
+def param_names_controller(func: Function):
     is_dto = len([p for p in func.params if not (p.url_placeholder or p.query_param)]) > 1
     return ", ".join(
         [p.name if p.url_placeholder or p.query_param or not is_dto
          else "request."+first_upper(p.name) for p in func.params])
 
 
-def request_uri_and_body(func: Function, from_record=False):
+def request_uri_and_body(func: Function, var_name=""):
     query_params, from_body = [], []
     path = str(func.rest_path.split("?")[0])
     post_or_put = func.http_verb == HTTP_POST or func.http_verb == HTTP_PUT
@@ -48,13 +48,13 @@ def request_uri_and_body(func: Function, from_record=False):
         if p.query_param:
             query_params.append(p.name)
         elif p.url_placeholder:
-            if from_record:
-                path = path.replace(f"{{{p.name}}}", f"{{p.{first_upper(p.name)}}}")
+            if var_name:
+                path = path.replace(f"{{{p.name}}}", f"{{{var_name}.{first_upper(p.name)}}}")
         elif post_or_put:
-            from_body.append(f"p.{first_upper(p.name)}" if from_record else p.name)
+            from_body.append(f"{var_name}.{first_upper(p.name)}" if var_name else p.name)
         else:
             query_params.append(p.name)
-    query_params_str = '?'+'&'.join([f'{{{f"p.{first_upper(n)}" if from_record else n}.ToQueryString("{n}")}}'
+    query_params_str = '?'+'&'.join([f'{{{f"{var_name}.{first_upper(n)}" if var_name else n}.ToQueryString("{n}")}}'
                                      for n in query_params])
     from_body_str = from_body[0] if len(from_body) == 1 else f'new {{ {", ".join(from_body)} }}'
     request_uri = f'$"{path}{query_params_str if query_params else ""}"'
@@ -81,14 +81,14 @@ class ServiceGenerator:
         env.filters["unfold_dep_function_params"] = \
             lambda f: ', '.join([f"{convert_type(p.type, DEP_NS)} {p.name}" for p in f.params])
         env.filters["unfold_record_params"] = \
-            lambda f: ', '.join([f"{convert_type(p.type, DEP_NS)} {first_upper(p.name)}"
-                                 for p in f.params])
+            lambda f: ', '.join([f"{convert_type(p.type, DEP_NS)} {first_upper(p.name)}" for p in f.params])
         env.filters["unfold_controller_function_params"] = self.unfold_controller_function_params
-        env.filters["param_names"] = param_names
+        env.filters["param_names_controller"] = param_names_controller
+        env.filters["param_names"] = lambda f: ", ".join([p.name for p in f.params])
         env.filters["get_default_ret_val"] = get_default_for_cb_pattern
+
         env.globals["request_uri_and_body"] = request_uri_and_body
         env.globals["as_type"] = lambda t: "Models."+t
-
         env.globals["service_name"] = self.service.name
         env.globals["header_comment"] = get_comment
 
@@ -292,7 +292,7 @@ class ServiceGenerator:
     def generate_startup(self):
         self.env.get_template("startup.template").stream({
             "producer_needed": bool(self.service.produces),
-            "repositories": [t.name for t in self.service.api.typedefs],
+            "repositories": [t.name for t in self.service.api.typedefs if t.crud_dict],
             "clients": [c.name for c in self.service.dependencies]
         }).dump(os.path.join(self.main_path, "Startup.cs"))
         self.env.get_template("program.template").stream({
