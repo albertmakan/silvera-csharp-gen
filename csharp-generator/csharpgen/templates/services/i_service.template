@@ -11,7 +11,7 @@ namespace {{service_name}}.Services.Base
         {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}});
         {%- endif %}
         {%- if "@update" in t.crud_dict %}
-        {{typename}} Update{{t.name}}({{typename}} {{t.name|lower}}Update);
+        {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update);
         {%- endif %}
         {%- if "@read" in t.crud_dict %}
         {{typename}} Read{{t.name}}({{id_datatype}} id);
@@ -27,7 +27,7 @@ namespace {{service_name}}.Services.Base
 
         {%- for func in msg_per_function %}
         {%- for msg_fqn in msg_per_function[func] %}
-        void {{func|first_upper}}(Messaging.Messages.{{msg_fqn}} message);
+        void {{func|first_upper}}(Messaging.Messages.{{msg_fqn|first_upper_fqn}} message);
         {%- endfor %}
         {%- endfor %}
     }

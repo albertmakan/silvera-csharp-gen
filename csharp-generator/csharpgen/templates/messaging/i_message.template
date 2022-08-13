@@ -2,8 +2,7 @@
 
 namespace {{service_name}}.Messaging.Messages
 {
-    public interface IMessage
-    {
-        string ToJson();
-    }
+    public interface IMessage { }
+
+    public class Message : IMessage { }
 }

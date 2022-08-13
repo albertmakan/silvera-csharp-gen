@@ -3,6 +3,7 @@
 using Confluent.Kafka;
 using {{service_name}}.Messaging.Messages;
 using System;
+using System.Text.Json;
 
 namespace {{service_name}}.Messaging
 {
@@ -21,7 +22,7 @@ namespace {{service_name}}.Messaging
             {
                 try
                 {
-                    return producer.ProduceAsync(topic, new() { Value = message.ToJson() });
+                    return producer.ProduceAsync(topic, new() { Value = JsonSerializer.Serialize(message) });
                 }
                 catch (Exception e)
                 {

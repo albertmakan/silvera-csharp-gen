@@ -9,7 +9,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
+using MongoDB.Bson.Serialization.IdGenerators;
 using Steeltoe.Discovery.Client;
 using Steeltoe.Discovery.Eureka;
 {% if clients -%}
@@ -76,7 +78,7 @@ namespace {{service_name}}
             services.AddSingleton<IMongoDbSettings>(p => p.GetRequiredService<IOptions<MongoDbSettings>>().Value);
 
             // DI
-            services.AddSingleton(typeof(IRepository<>), typeof(Repository<>));
+            services.AddSingleton(typeof(IRepository<,>), typeof(Repository<,>));
             {%- for repo in repositories %}
             services.AddSingleton(typeof(I{{repo}}Repository), typeof({{repo}}Repository));
             {%- endfor %}
@@ -120,6 +122,8 @@ namespace {{service_name}}
                 new CamelCaseElementNameConvention(),
                 new IgnoreExtraElementsConvention(true)
             }, t => true);
+
+            BsonSerializer.RegisterIdGenerator(typeof(string), StringObjectIdGenerator.Instance);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

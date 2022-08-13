@@ -2,7 +2,7 @@
 
 namespace {{service_name}}.Repository.Contracts
 {
-    public interface I{{typedef}}Repository : IRepository<{{as_type(typedef)}}>
+    public interface I{{typedef}}Repository : IRepository<{{as_type(typedef)}}, {{id_datatype}}>
     {
         // custom repo methods
     }

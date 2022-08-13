@@ -39,7 +39,7 @@ namespace {{service_name}}.Controllers
         [HttpPut("{{t.name|lower}}/{id}")]
         public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
         {
-            return _{{service_name|first_lower}}Service.Update{{t.name}}({{t.name|lower}}Update);
+            return _{{service_name|first_lower}}Service.Update{{t.name}}(id, {{t.name|lower}}Update);
         }
         {%- endif %}
         {% if "@delete" in t.crud_dict %}

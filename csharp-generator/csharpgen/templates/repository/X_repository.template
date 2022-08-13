@@ -5,7 +5,7 @@ using {{service_name}}.Settings;
 
 namespace {{service_name}}.Repository.Impl
 {
-    public class {{typedef}}Repository : Repository<{{as_type(typedef)}}>, I{{typedef}}Repository
+    public class {{typedef}}Repository : Repository<{{as_type(typedef)}}, {{id_datatype}}>, I{{typedef}}Repository
     {
         public {{typedef}}Repository(IMongoDbSettings settings) : base(settings) { }
 

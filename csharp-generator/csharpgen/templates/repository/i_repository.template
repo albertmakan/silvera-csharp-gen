@@ -9,26 +9,26 @@ using {{service_name}}.Models;
 
 namespace {{service_name}}.Repository.Contracts
 {
-    public interface IRepository<TDocument> where TDocument : IDocument
+    public interface IRepository<TDocument, TID> where TDocument : class
     {
         IQueryable<TDocument> AsQueryable();
         IEnumerable<TDocument> FilterBy(Expression<Func<TDocument, bool>> filterExpression);
         IEnumerable<TProjected> FilterBy<TProjected>(Expression<Func<TDocument, bool>> filterExpression,
-                                                     Expression<Func<TDocument, TProjected>> projectionExpression);
+            Expression<Func<TDocument, TProjected>> projectionExpression);
         TDocument FindOne(Expression<Func<TDocument, bool>> filterExpression);
         Task<TDocument> FindOneAsync(Expression<Func<TDocument, bool>> filterExpression);
-        TDocument FindById(string id);
-        Task<TDocument> FindByIdAsync(string id);
+        TDocument FindById(TID id);
+        Task<TDocument> FindByIdAsync(TID id);
         TDocument InsertOne(TDocument document);
         Task<TDocument> InsertOneAsync(TDocument document);
         ICollection<TDocument> InsertMany(ICollection<TDocument> documents);
         Task<ICollection<TDocument>> InsertManyAsync(ICollection<TDocument> documents);
-        TDocument ReplaceOne(TDocument document);
-        Task<TDocument> ReplaceOneAsync(TDocument document);
+        TDocument ReplaceOne(TID id, TDocument document);
+        Task<TDocument> ReplaceOneAsync(TID id, TDocument document);
         void DeleteOne(Expression<Func<TDocument, bool>> filterExpression);
         Task DeleteOneAsync(Expression<Func<TDocument, bool>> filterExpression);
-        void DeleteById(string id);
-        Task DeleteByIdAsync(string id);
+        void DeleteById(TID id);
+        Task DeleteByIdAsync(TID id);
         void DeleteMany(Expression<Func<TDocument, bool>> filterExpression);
         Task DeleteManyAsync(Expression<Func<TDocument, bool>> filterExpression);
     }

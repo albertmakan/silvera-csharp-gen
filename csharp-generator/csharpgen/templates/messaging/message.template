@@ -1,16 +1,11 @@
 /**{{header_comment()}}*/
 
-using System.Text.Json;
-
 namespace {{service_name}}.Messaging.{{namespace}}
 {
-    public class {{message.name}} : IMessage
+    public class {{message.name|first_upper}} : Message
     {
         {%- for field in message.fields %}
         public {{field.type|convert_type}} {{field.name|first_upper}} { get; set; }
         {%- endfor %}
-
-        public override string ToString() => JsonSerializer.Serialize(this);
-        public string ToJson() => ToString();
     }
 }

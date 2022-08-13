@@ -13,7 +13,7 @@ using {{service_name}}.Services.Dependencies;
 {%- macro crud_produces(typedef, op) %}
     {%- if typedef.crud_dict[op] %}
     {%- set message_fqn, channel_name, _ = typedef.crud_dict[op] %}
-            _kafkaProducer.Send("{{channel_name}}", new Messaging.Messages.{{message_fqn}}()
+            _kafkaProducer.Send("{{channel_name}}", new Messaging.Messages.{{message_fqn|first_upper_fqn}}()
             {
                 // Here set values to the message attributes
             });
@@ -22,7 +22,7 @@ using {{service_name}}.Services.Dependencies;
 
 {%- macro function_produces(function) %}
     {%- for message, channel in function.produces %}
-            _kafkaProducer.Send("{{channel.name}}", new Messaging.Messages.{{message.fqn}}()
+            _kafkaProducer.Send("{{channel.name}}", new Messaging.Messages.{{message.fqn|first_upper_fqn}}()
             {
                 // Here set values to the message attributes
             });
@@ -37,7 +37,7 @@ namespace {{service_name}}.Services.Impl
         private readonly {{t}} _{{name}};
         {%- endfor %}
         {%- for ch in function_per_channel %}
-        private readonly IKafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn}}> _{{ch.name}}Consumer;
+        private readonly IKafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn|first_upper_fqn}}> _{{ch.name}}Consumer;
         {%- endfor %}
 
         public {{service_name}}Service({{constructor_params}})
@@ -46,7 +46,7 @@ namespace {{service_name}}.Services.Impl
             _{{name}} = {{name}};
             {%- endfor %}
             {%- for ch in function_per_channel %}
-            _{{ch.name}}Consumer = new KafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn}}>("{{ch.name}}");
+            _{{ch.name}}Consumer = new KafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn|first_upper_fqn}}>("{{ch.name}}");
             {%- for f in function_per_channel[ch] %}
             _{{ch.name}}Consumer.AddListener({{f|first_upper}});
             {%- endfor %}
@@ -74,10 +74,10 @@ namespace {{service_name}}.Services.Impl
         }
         {%- endif %}
         {% if "@update" in t.crud_dict %}
-        public {{typename}} Update{{t.name}}({{typename}} {{t.name|lower}}Update)
+        public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
         {
-            var {{t.name|lower}} = Read{{t.name}}({{t.name|lower}}Update.Id);
-            _{{t.name|first_lower}}Repository.ReplaceOne({{t.name|lower}}Update);
+            var {{t.name|lower}} = Read{{t.name}}(id);
+            _{{t.name|first_lower}}Repository.ReplaceOne(id, {{t.name|lower}}Update);
             {{- crud_produces(t, "@update")}}
             return {{t.name|lower}}Update;
         }
@@ -103,7 +103,7 @@ namespace {{service_name}}.Services.Impl
 
         {%- for func in msg_per_function %}
         {% for msg_fqn in msg_per_function[func] %}
-        public void {{func|first_upper}}(Messaging.Messages.{{msg_fqn}} message)
+        public void {{func|first_upper}}(Messaging.Messages.{{msg_fqn|first_upper_fqn}} message)
         {
             // TODO: Implement this method
             {{- function_produces(func) }}
