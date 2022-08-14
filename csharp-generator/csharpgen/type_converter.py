@@ -3,6 +3,8 @@ import warnings
 from silvera.core import TypedList, TypeDef, TypedSet, TypedDict, Function
 
 # silvera types
+from csharpgen.formatters import first_upper
+
 VOID = "void"
 STRING = "str"
 PASSWORD = "pwd"
@@ -75,7 +77,7 @@ def convert_type(_type, prefix=MODELS_NS):
                 return f"{CSHARP['ASYNC_RET_TYPE']}<{_convert_type(func.ret_type)}>"
             return _convert_type(func.ret_type)
         if isinstance(_type, TypeDef):
-            return prefix + _type.name
+            return prefix + first_upper(_type.name)
         if isinstance(_type, TypedList):
             return f"{CSHARP['COLLECTIONS'][LIST]}<{_convert_type(_type.type)}>"
         if isinstance(_type, TypedSet):

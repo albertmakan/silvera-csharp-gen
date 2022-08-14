@@ -5,13 +5,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace {{service_name}}.Models
 {
-    public class {{name}}
+    public class {{typedef.name}}
     {
         {% if not id_attr -%}
         [BsonId]
         public string Id { get; set; }
         {%- endif %}
-        {%- for attr in attributes %}
+        {%- for attr in typedef.fields %}
         {% if attr.required %}[Required]{% endif %}
         {%- if attr.isid %}[BsonId]{% endif %}
         public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }

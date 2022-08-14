@@ -2,9 +2,9 @@
 
 namespace {{service_name}}.Models.Dependencies
 {
-    public class {{name}}
+    public class {{typedef.name}}
     {
-        {%- for attr in attributes %}
+        {%- for attr in typedef.fields %}
         public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
         {%- endfor %}
     }

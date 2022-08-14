@@ -9,9 +9,18 @@ from csharpgen.type_converter import convert_type
 
 
 def check_messaging(service: ServiceDecl):
-    channels = {}
+    messages = set(service.produces.keys())
+    messages.update(service.consumes.keys())
     fqns = []
-    cant_be = ["Message", "IMessage"]
+    for m in messages:
+        if first_upper(m.name) in ["Message", "IMessage"]:
+            raise Exception(f'Message name cannot be Message or IMessage')
+        fqn = first_upper_fqn(m.fqn)
+        if fqn in fqns:
+            raise Exception(f"Duplicate message found: {fqn}")
+        fqns.append(fqn)
+
+    channels = {}
     brokers = service.parent.model.msg_brokers
     for mb in brokers:
         for ch in brokers[mb].channels:
@@ -20,23 +29,11 @@ def check_messaging(service: ServiceDecl):
         channels.update(brokers[mb].channels)
 
     for m in service.consumes:
-        fqn = first_upper_fqn(m.fqn)
-        if fqn in fqns:
-            raise Exception(f"Duplicate message found: {fqn}")
-        fqns.append(fqn)
-        if first_upper(m.name) in cant_be:
-            raise Exception(f'Message name cannot be in {cant_be}')
         for ch in service.consumes[m]:
             if ch.msg_type.fqn != m.fqn:
                 raise Exception(f"{service.name}: Cannot consume message of type {m.fqn} from channel "
                                 f"{ch.name}({ch.msg_type.fqn})")
     for m in service.produces:
-        fqn = first_upper_fqn(m.fqn)
-        if fqn in fqns:
-            raise Exception(f"Duplicate message found: {fqn}")
-        fqns.append(fqn)
-        if first_upper(m.name) in cant_be:
-            raise Exception(f'Message name cannot be in {cant_be}')
         for ch in service.produces[m]:
             if isinstance(ch, set):
                 for ch1 in ch:

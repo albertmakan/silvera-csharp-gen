@@ -80,8 +80,7 @@ class ServiceGenerator:
                 raise Exception(f"{self.service.name}: {typedef.name}: Only string ids are supported for now.")
 
             class_template.stream({
-                "name": typedef.name,
-                "attributes": typedef.fields,
+                "typedef": typedef,
                 "id_attr": id_attr[0] if id_attr else None,
             }).dump(os.path.join(models_path, typedef.name + ".cs"))
 
@@ -119,8 +118,7 @@ class ServiceGenerator:
             check_fields(typedef)
             typedef.name = first_upper(typedef.name)
             class_template.stream({
-                "name": typedef.name,
-                "attributes": typedef.fields,
+                "typedef": typedef,
             }).dump(os.path.join(dependencies_path, typedef.name + ".cs"))
 
     def generate_repositories(self):
