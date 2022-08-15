@@ -18,7 +18,8 @@ namespace {{service_name}}.Repository.Impl
         public Repository(IMongoDbSettings settings)
         {
             var database = new MongoClient(settings.ConnectionString).GetDatabase(settings.DatabaseName);
-            _collection = database.GetCollection<TDocument>(typeof(TDocument).Name.ToLower());
+            var typename = typeof(TDocument).Name;
+            _collection = database.GetCollection<TDocument>(typename[0..1].ToLower() + typename[1..]);
         }
 
         public virtual IQueryable<TDocument> AsQueryable()
@@ -26,12 +27,12 @@ namespace {{service_name}}.Repository.Impl
             return _collection.AsQueryable();
         }
 
-        public virtual IEnumerable<TDocument> FilterBy(Expression<Func<TDocument, bool>> filterExpression)
+        public virtual IEnumerable<TDocument> Filter(Expression<Func<TDocument, bool>> filterExpression)
         {
             return _collection.Find(filterExpression).ToEnumerable();
         }
 
-        public virtual IEnumerable<TProjected> FilterBy<TProjected>(Expression<Func<TDocument, bool>> filterExpression,
+        public virtual IEnumerable<TProjected> FilterAndProject<TProjected>(Expression<Func<TDocument, bool>> filterExpression,
             Expression<Func<TDocument, TProjected>> projectionExpression)
         {
             return _collection.Find(filterExpression).Project(projectionExpression).ToEnumerable();
@@ -89,14 +90,14 @@ namespace {{service_name}}.Repository.Impl
             return documents;
         }
 
-        public TDocument ReplaceOne(TID id, TDocument document)
+        public TDocument UpdateOne(TID id, TDocument document)
         {
             var filter = Builders<TDocument>.Filter.Eq("_id", id);
             _collection.FindOneAndReplace(filter, document);
             return document;
         }
 
-        public virtual async Task<TDocument> ReplaceOneAsync(TID id, TDocument document)
+        public virtual async Task<TDocument> UpdateOneAsync(TID id, TDocument document)
         {
             var filter = Builders<TDocument>.Filter.Eq("_id", id);
             await _collection.FindOneAndReplaceAsync(filter, document);

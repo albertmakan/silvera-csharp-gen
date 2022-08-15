@@ -77,7 +77,7 @@ namespace {{service_name}}.Services.Impl
         public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
         {
             var {{t.name|lower}} = Read{{t.name}}(id);
-            _{{t.name|first_lower}}Repository.ReplaceOne(id, {{t.name|lower}}Update);
+            _{{t.name|first_lower}}Repository.UpdateOne(id, {{t.name|lower}}Update);
             {{- crud_produces(t, "@update")}}
             return {{t.name|lower}}Update;
         }

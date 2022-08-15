@@ -24,9 +24,9 @@ DICT = "dict"
 CSHARP = {
     "TYPES": {
         INT: "int",
-        i16: "System.Int16",
-        i32: "System.Int32",
-        i64: "System.Int64",
+        i16: "short",
+        i32: "int",
+        i64: "long",
         FLOAT: "float",
         DOUBLE: "double",
         STRING: "string",

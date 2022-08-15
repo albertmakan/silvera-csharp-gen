@@ -195,23 +195,18 @@ class ServiceGenerator:
         dep_path = create_if_missing(os.path.join(services_path, "Dependencies"))
 
         fns_by_service = defaultdict(list)
-        use_circuit_breaker = False
         for fn in self.service.dep_functions:
-            if fn.cb_pattern not in {None, "fail_fast"}:
-                use_circuit_breaker = True
             fns_by_service[fn.service_name].append(fn)
 
         self.env.get_template("utils/url_helpers.template").stream().dump(
             os.path.join(create_if_missing(os.path.join(self.main_path, "Utils")), "UrlHelpers.cs"))
         dep_template = self.env.get_template("services/dependency_service.template")
         for s in self.service.dependencies:
+            fns = fns_by_service[s.name]
             dep_template.stream({
                 "dependency_service_name": s.name,
-                "functions": fns_by_service[s.name],
-                "has_domain_dependencies": len(self.service.dep_typedefs) > 0,
-                "use_circuit_breaker": use_circuit_breaker,
-                "uses_registry": bool(s.service_registry),
-                "service_url": f"{s.url}:{s.port}/"
+                "functions": fns,
+                "use_circuit_breaker": any(fn.cb_pattern not in [None, "fail_fast"] for fn in fns)
             }).dump(os.path.join(dep_path, s.name + "Client.cs"))
 
     def generate_service(self):
@@ -242,7 +237,7 @@ class ServiceGenerator:
         }).dump(impl_file)
 
     def generate_controller(self):
-        controller_path = create_if_missing(os.path.join(self.main_path, "Controllers"))
+        controller_path = create_if_missing(os.path.join(self.main_path, "Controller"))
         self.env.get_template("controllers/controller.template").stream({
             "api": self.service.api,
         }).dump(os.path.join(controller_path, self.service.name + "Controller.cs"))
@@ -251,17 +246,21 @@ class ServiceGenerator:
         self.env.get_template("startup.template").stream({
             "producer_needed": bool(self.service.produces),
             "repositories": [t.name for t in self.service.api.typedefs if t.crud_dict],
-            "clients": [c.name for c in self.service.dependencies]
+            "dependencies": self.service.dependencies,
+            "should_register": bool(self.service.service_registry)
         }).dump(os.path.join(self.main_path, "Startup.cs"))
         self.env.get_template("program.template").stream({
-            "port": self.service.port
+            "port": self.service.port,
+            "should_register": bool(self.service.service_registry)
         }).dump(os.path.join(self.main_path, "Program.cs"))
 
     def generate_csproj(self):
         self.env.get_template("csproj.template").stream({
             "producer_needed": bool(self.service.produces),
             "consumer_needed": bool(self.service.consumes),
-            "httpclient_needed": bool(self.service.dependencies)
+            "circuit_breaker_needed": any(f.cb_pattern not in [None, "fail_fast"] for f in self.service.dep_functions),
+            "httpclient_needed": bool(self.service.dependencies),
+            "should_register": bool(self.service.service_registry)
         }).dump(os.path.join(self.main_path, self.service.name+".csproj"))
 
     def generate_settings(self):

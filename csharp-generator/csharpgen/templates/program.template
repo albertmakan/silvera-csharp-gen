@@ -2,20 +2,21 @@
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
+{% if should_register -%}
 using Steeltoe.Common.Hosting;
+{%- endif %}
 
 namespace {{service_name}}
 {
     public class Program
     {
-        public static void Main(string[] args)
-        {
-            CreateHostBuilder(args).Build().Run();
-        }
-
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
+        public static void Main(string[] args) =>
             Host.CreateDefaultBuilder(args)
-                .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>())
-                .UseCloudHosting({{port}});
+                .ConfigureWebHostDefaults(builder => builder.UseStartup<Startup>())
+                {% if should_register -%}
+                .UseCloudHosting({{port}})
+                {%- endif %}
+                .Build()
+                .Run();
     }
 }

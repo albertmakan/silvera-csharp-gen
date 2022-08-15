@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using {{service_name}}.Filters;
 using {{service_name}}.Services.Base;
 
-namespace {{service_name}}.Controllers
+namespace {{service_name}}.Controller
 {
     [ApiController]
     [Produces("application/json")]

@@ -9,12 +9,12 @@ using System.Text.Json;
 
 namespace {{service_name}}.Messaging
 {
-    public interface IKafkaConsumer<T> where T : IMessage
+    public interface IKafkaConsumer<TMessage> where TMessage : IMessage
     {
-        void AddListener(Action<T> listener);
+        void AddListener(Action<TMessage> listener);
     }
 
-    public class KafkaConsumer<T> : IKafkaConsumer<T> where T : IMessage
+    public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage : IMessage
     {
         private readonly string _topic;
         private readonly ClusterClient _clusterClient;
@@ -26,15 +26,14 @@ namespace {{service_name}}.Messaging
             _clusterClient.ConsumeFromLatest(_topic);
         }
 
-        public void AddListener(Action<T> action)
+        public void AddListener(Action<TMessage> action)
         {
             _clusterClient.MessageReceived += record =>
             {
                 string msg = Encoding.UTF8.GetString(record.Value as byte[]);
                 try
                 {
-                    T obj = JsonSerializer.Deserialize<T>(msg);
-                    action(obj);
+                    action(JsonSerializer.Deserialize<TMessage>(msg));
                 }
                 catch (Exception)
                 {

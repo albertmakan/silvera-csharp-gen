@@ -12,7 +12,7 @@
   "MongoDbSettings": {
     "ConnectionString": "mongodb://localhost:27017",
     "DatabaseName": "{{database_name}}"
-  },
+  }{%- if should_register -%},
 
   "Eureka": {
     "Instance": {
@@ -22,8 +22,8 @@
       "preferIpAddress": true
     },
     "Client": {
-      "EurekaServerServiceUrls": "{{registry_url}}:{{registry_port}}/eureka",
-      "ShouldRegisterWithEureka": {{"true" if should_register else "false"}}
+      "EurekaServerServiceUrls": "{{registry_url}}:{{registry_port}}/eureka"
     }
   }
+{% endif %}
 }

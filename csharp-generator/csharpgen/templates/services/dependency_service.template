@@ -1,10 +1,12 @@
 /**{{header_comment()}}*/
 
-using {{service_name}}.Utils;
+{% if use_circuit_breaker -%}
 using Steeltoe.CircuitBreaker.Hystrix;
+{%- endif %}
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
+using {{service_name}}.Utils;
 
 namespace {{service_name}}.Services.Dependencies
 {
@@ -31,12 +33,7 @@ namespace {{service_name}}.Services.Dependencies
             {{"" if function.ret_type == "void" else "return " -}}
             new {{function.name|first_upper}}Command(_httpClientFactory, new({{function.dep|param_names}})).Execute();
             {%- else -%}
-            {% if uses_registry -%}
             using var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
-            {%- else -%}
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.BaseAddress = new("{{service_url}}");
-            {%- endif %}
 
             var response = httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
@@ -68,12 +65,7 @@ namespace {{service_name}}.Services.Dependencies
         protected override async Task<{{
             "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}> RunAsync()
         {
-            {% if uses_registry -%}
             using var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
-            {%- else -%}
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.BaseAddress = new("{{service_url}}");
-            {%- endif %}
 
             var response = await httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]

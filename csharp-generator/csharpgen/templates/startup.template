@@ -12,8 +12,10 @@ using Microsoft.OpenApi.Models;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.IdGenerators;
+{% if should_register -%}
 using Steeltoe.Discovery.Client;
 using Steeltoe.Discovery.Eureka;
+{%- endif -%}
 {% if clients -%}
 using Steeltoe.Common.Http.Discovery;
 {%- endif %}
@@ -40,12 +42,19 @@ namespace {{service_name}}
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            {% if should_register -%}
+            // Register service
             services.AddDiscoveryClient(Configuration);
             services.AddServiceDiscovery(a => a.UseEureka());
+            {% endif %}
 
-            {%- for client in clients %}
-            services.AddHttpClient("{{client}}", client => client.BaseAddress = new Uri("http://{{client}}/"))
+            {%- for ds in dependencies %}
+            {% if ds.service_registry -%}
+            services.AddHttpClient("{{ds.name}}", client => client.BaseAddress = new Uri("http://{{ds.name}}/"))
                     .AddServiceDiscovery();
+            {%- else -%}
+            services.AddHttpClient("{{ds.name}}", client => client.BaseAddress = new Uri("{{ds.url}}:{{ds.port}}/"));
+            {%- endif %}
             {%- endfor %}
 
             services.AddControllers();
@@ -77,7 +86,7 @@ namespace {{service_name}}
             services.Configure<MongoDbSettings>(Configuration.GetSection("MongoDbSettings"));
             services.AddSingleton<IMongoDbSettings>(p => p.GetRequiredService<IOptions<MongoDbSettings>>().Value);
 
-            // DI
+            // Dependency injection
             services.AddSingleton(typeof(IRepository<,>), typeof(Repository<,>));
             {%- for repo in repositories %}
             services.AddSingleton(typeof(I{{repo}}Repository), typeof({{repo}}Repository));
