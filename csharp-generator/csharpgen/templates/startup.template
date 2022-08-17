@@ -16,7 +16,7 @@ using MongoDB.Bson.Serialization.IdGenerators;
 using Steeltoe.Discovery.Client;
 using Steeltoe.Discovery.Eureka;
 {%- endif -%}
-{% if clients -%}
+{% if dependencies -%}
 using Steeltoe.Common.Http.Discovery;
 {%- endif %}
 using System;
@@ -25,7 +25,6 @@ using System.Text;
 using {{service_name}}.Middleware;
 using {{service_name}}.Repository.Contracts;
 using {{service_name}}.Repository.Impl;
-using {{service_name}}.Services.Base;
 using {{service_name}}.Settings;
 
 namespace {{service_name}}
@@ -96,11 +95,11 @@ namespace {{service_name}}
             services.AddSingleton(typeof(Messaging.IKafkaProducer), typeof(Messaging.KafkaProducer));
             {%- endif %}
 
-            {%- for client in clients %}
-            services.AddSingleton(typeof(Services.Dependencies.I{{client}}Client), typeof(Services.Dependencies.{{client}}Client));
+            {%- for ds in dependencies %}
+            services.AddSingleton(typeof(Services.Dependencies.I{{ds.name}}Client), typeof(Services.Dependencies.{{ds.name}}Client));
             {%- endfor %}
 
-            services.AddSingleton(typeof(I{{service_name}}Service), typeof(Services.Impl.{{service_name}}Service));
+            services.AddSingleton(typeof(Services.Base.I{{service_name}}Service), typeof(Services.Impl.{{service_name}}Service));
 
             // Uncomment for AUTHENTICATION:
             /**
@@ -160,7 +159,7 @@ namespace {{service_name}}
                 endpoints.MapControllers();
             });
 
-            app.ApplicationServices.GetService<I{{service_name}}Service>();
+            app.ApplicationServices.GetService<Services.Base.I{{service_name}}Service>();
         }
     }
 }
