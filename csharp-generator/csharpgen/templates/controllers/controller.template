@@ -1,15 +1,13 @@
 /**{{header_comment()}}*/
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using {{service_name}}.Filters;
+using System.Net.Mime;
 using {{service_name}}.Services.Base;
 
 namespace {{service_name}}.Controller
 {
     [ApiController]
-    [Produces("application/json")]
-    [ValidateModel]
+    [Produces(MediaTypeNames.Application.Json)]
     public class {{service_name}}Controller : ControllerBase
     {
         private readonly I{{service_name}}Service _{{service_name|first_lower}}Service;

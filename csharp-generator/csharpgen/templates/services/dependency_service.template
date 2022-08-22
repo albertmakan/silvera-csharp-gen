@@ -33,7 +33,7 @@ namespace {{service_name}}.Services.Dependencies
             {{"" if function.ret_type == "void" else "return " -}}
             new {{function.name|first_upper}}Command(_httpClientFactory, new({{function.dep|param_names}})).Execute();
             {%- else -%}
-            using var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
+            var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
 
             var response = httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
@@ -65,7 +65,7 @@ namespace {{service_name}}.Services.Dependencies
         protected override async Task<{{
             "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}> RunAsync()
         {
-            using var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
+            var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
 
             var response = await httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]

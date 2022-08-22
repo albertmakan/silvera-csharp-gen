@@ -7,14 +7,14 @@ namespace {{service_name}}.Models
 {
     public class {{typedef.name}}
     {
-        {% if not id_attr -%}
+        {% if not id_field -%}
         [BsonId]
         public string Id { get; set; }
         {%- endif %}
-        {%- for attr in typedef.fields %}
-        {% if attr.required %}[Required]{% endif %}
-        {%- if attr.isid %}[BsonId]{% endif %}
-        public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
+        {%- for field in typedef.fields %}
+        {% if field.required %}[Required]{% endif %}
+        {%- if field.isid %}[BsonId]{% endif %}
+        public {{field.type|convert_type_in_model}} {{field.name|first_upper}} { get; set; }
         {%- endfor %}
     }
 }

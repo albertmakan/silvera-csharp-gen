@@ -11,10 +11,7 @@ namespace {{service_name}}.Middleware
     public class ErrorHandlerMiddleware
     {
         private readonly RequestDelegate _next;
-        public ErrorHandlerMiddleware(RequestDelegate next)
-        {
-            _next = next;
-        }
+        public ErrorHandlerMiddleware(RequestDelegate next) => _next = next;
 
         public async Task InvokeAsync(HttpContext context)
         {
@@ -24,22 +21,19 @@ namespace {{service_name}}.Middleware
             }
             catch (Exception exception)
             {
-                await HandleResponseBasedOnException(context, exception);
+                context.Response.ContentType = "application/json";
+                context.Response.StatusCode = (int)(exception switch
+                {
+                    BadLogicException => HttpStatusCode.BadRequest,
+                    UnauthorizedException => HttpStatusCode.Unauthorized,
+                    ForbiddenException => HttpStatusCode.Forbidden,
+                    NotFoundException => HttpStatusCode.NotFound,
+                    ConflictException => HttpStatusCode.Conflict,
+                    NotImplementedException => HttpStatusCode.NotImplemented,
+                    _ => HttpStatusCode.InternalServerError,
+                });
+                await context.Response.WriteAsJsonAsync(new { context.Response.StatusCode, exception.Message });
             }
-        }
-
-        private static Task HandleResponseBasedOnException(HttpContext context, Exception exception)
-        {
-            context.Response.ContentType = "application/json";
-            context.Response.StatusCode = (int)(exception switch
-            {
-                NotFoundException => HttpStatusCode.NotFound,
-                BadLogicException => HttpStatusCode.BadRequest,
-                ForbiddenException => HttpStatusCode.Forbidden,
-                UnauthorizedException => HttpStatusCode.Unauthorized,
-                _ => HttpStatusCode.InternalServerError,
-            });
-            return context.Response.WriteAsJsonAsync(new { context.Response.StatusCode, exception.Message });
         }
     }
 }

@@ -10,13 +10,11 @@ namespace {{service_name}}.Exceptions
         public BadLogicException(string message) : base(message) { }
     }
 
-
     public class NotFoundException : Exception
     {
         public NotFoundException() : base() { }
         public NotFoundException(string message) : base(message) { }
     }
-
 
     public class ForbiddenException : Exception
     {
@@ -24,11 +22,15 @@ namespace {{service_name}}.Exceptions
         public ForbiddenException(string message) : base(message) { }
     }
 
-
     public class UnauthorizedException : Exception
     {
         public UnauthorizedException() : base() { }
         public UnauthorizedException(string message) : base(message) { }
     }
 
+    public class ConflictException : Exception
+    {
+        public ConflictException() : base() { }
+        public ConflictException(string message) : base(message) { }
+    }
 }

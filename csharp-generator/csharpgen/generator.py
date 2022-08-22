@@ -73,15 +73,15 @@ class ServiceGenerator:
 
         for typedef in self.service.api.typedefs:
             typedef.name = first_upper(typedef.name)
-            id_attr = [a for a in typedef.fields if a.isid]
-            if len(id_attr) > 1:
+            id_field = [f for f in typedef.fields if f.isid]
+            if len(id_field) > 1:
                 raise Exception(f"{self.service.name}: Duplicate @id in {typedef.name}!")
-            if id_attr and id_attr[0].type != "str":
+            if id_field and id_field[0].type != "str":
                 raise Exception(f"{self.service.name}: {typedef.name}: Only string ids are supported for now.")
 
             class_template.stream({
                 "typedef": typedef,
-                "id_attr": id_attr[0] if id_attr else None,
+                "id_field": id_field[0] if id_field else None,
             }).dump(os.path.join(models_path, typedef.name + ".cs"))
 
             if typedef.inherits:
@@ -160,8 +160,6 @@ class ServiceGenerator:
             os.path.join(create_if_missing(os.path.join(self.main_path, "Exceptions")), "CustomExceptions.cs"))
         self.env.get_template("others/error_middleware.template").stream().dump(
             os.path.join(create_if_missing(os.path.join(self.main_path, "Middleware")), "ErrorHandlerMiddleware.cs"))
-        self.env.get_template("others/validate_model_attribute.template").stream().dump(
-            os.path.join(create_if_missing(os.path.join(self.main_path, "Filters")), "ValidateModelAttribute.cs"))
 
     def unfold_controller_function_params(self, func: Function):
         params, from_body = [], []
@@ -243,14 +241,11 @@ class ServiceGenerator:
         }).dump(os.path.join(controller_path, self.service.name + "Controller.cs"))
 
     def generate_startup(self):
-        self.env.get_template("startup.template").stream({
+        self.env.get_template("program.template").stream({
+            "port": self.service.port,
             "producer_needed": bool(self.service.produces),
             "repositories": [t.name for t in self.service.api.typedefs if t.crud_dict],
             "dependencies": self.service.dependencies,
-            "should_register": bool(self.service.service_registry)
-        }).dump(os.path.join(self.main_path, "Startup.cs"))
-        self.env.get_template("program.template").stream({
-            "port": self.service.port,
             "should_register": bool(self.service.service_registry)
         }).dump(os.path.join(self.main_path, "Program.cs"))
 
@@ -304,7 +299,7 @@ class ServiceGenerator:
             create_package(mg, messages_path)
 
 
-def generate(service: ServiceDecl, output_dir, debug):
+def generate(service: ServiceDecl, output_dir: str, debug: bool):
     print("Called C#!")
     print(service, output_dir, debug)
     sg = ServiceGenerator(service, output_dir)

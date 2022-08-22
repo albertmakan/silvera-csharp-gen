@@ -26,7 +26,7 @@ namespace {{service_name}}.Messaging
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Oops, something went wrong: {e}");
+                    Console.WriteLine($"Something went wrong while sending: {e}");
                 }
             }
             return null;
