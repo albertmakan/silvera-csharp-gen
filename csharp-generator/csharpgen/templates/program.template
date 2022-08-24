@@ -17,6 +17,7 @@ using MongoDB.Bson.Serialization.IdGenerators;
 {% if should_register -%}
 using Steeltoe.Discovery.Client;
 using Steeltoe.Discovery.Eureka;
+using Steeltoe.Common.Hosting;
 {%- endif %}
 {% if dependencies -%}
 using Steeltoe.Common.Http.Discovery;
@@ -34,17 +35,17 @@ using {{service_name}}.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 {% if should_register -%}
 // Register service
 builder.Services.AddDiscoveryClient(builder.Configuration);
 builder.Services.AddServiceDiscovery(a => a.UseEureka());
+builder.UseCloudHosting({{port}});
 {% endif %}
 
 {%- for ds in dependencies %}
 {% if ds.service_registry -%}
 builder.Services.AddHttpClient("{{ds.name}}", client => client.BaseAddress = new Uri("http://{{ds.name}}/"))
-        .AddServiceDiscovery();
+    .AddServiceDiscovery();
 {%- else -%}
 builder.Services.AddHttpClient("{{ds.name}}", client => client.BaseAddress = new Uri("{{ds.url}}:{{ds.port}}/"));
 {%- endif %}
@@ -80,20 +81,20 @@ builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("Mo
 builder.Services.AddSingleton<IMongoDbSettings>(p => p.GetRequiredService<IOptions<MongoDbSettings>>().Value);
 
 // Dependency injection
-builder.Services.AddSingleton(typeof(IRepository<,>), typeof(Repository<,>));
+// builder.Services.AddSingleton(typeof(IRepository<,>), typeof(Repository<,>));
 {%- for repo in repositories %}
-builder.Services.AddSingleton(typeof(I{{repo}}Repository), typeof({{repo}}Repository));
+builder.Services.AddSingleton<I{{repo}}Repository, {{repo}}Repository>();
 {%- endfor %}
 
 {%- if producer_needed %}
-builder.Services.AddSingleton(typeof(IKafkaProducer), typeof(KafkaProducer));
+builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
 {%- endif %}
 
 {%- for ds in dependencies %}
-builder.Services.AddSingleton(typeof(Dep.I{{ds.name}}Client), typeof(Dep.{{ds.name}}Client));
+builder.Services.AddSingleton<Dep.I{{ds.name}}Client, Dep.{{ds.name}}Client>();
 {%- endfor %}
 
-builder.Services.AddSingleton(typeof(Base.I{{service_name}}Service), typeof(Impl.{{service_name}}Service));
+builder.Services.AddSingleton<Base.I{{service_name}}Service, Impl.{{service_name}}Service>();
 
 // Uncomment for AUTHENTICATION:
 /**

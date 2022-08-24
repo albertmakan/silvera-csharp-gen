@@ -19,10 +19,11 @@ namespace {{service_name}}.Messaging
         private readonly string _topic;
         private readonly ClusterClient _clusterClient;
 
-        public KafkaConsumer(string topic)
+        public KafkaConsumer(string topic, params Action<TMessage>[] actions)
         {
             _topic = topic;
             _clusterClient = new(new() { Seeds = "localhost:9092" }, new ConsoleLogger());
+            foreach (var action in actions) AddListener(action);
             _clusterClient.ConsumeFromLatest(_topic);
         }
 
@@ -30,10 +31,12 @@ namespace {{service_name}}.Messaging
         {
             _clusterClient.MessageReceived += record =>
             {
-                string msg = Encoding.UTF8.GetString(record.Value as byte[]);
+                string msg = "";
                 try
                 {
-                    action(JsonSerializer.Deserialize<TMessage>(msg));
+                    msg = Encoding.UTF8.GetString(record.Value as byte[]);
+                    TMessage message = JsonSerializer.Deserialize<TMessage>(msg);
+                    action(message);
                 }
                 catch (Exception)
                 {

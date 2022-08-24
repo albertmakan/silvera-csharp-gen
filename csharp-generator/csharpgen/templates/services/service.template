@@ -46,10 +46,11 @@ namespace {{service_name}}.Services.Impl
             _{{name}} = {{name}};
             {%- endfor %}
             {%- for ch in function_per_channel %}
-            _{{ch.name}}Consumer = new KafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn|first_upper_fqn}}>("{{ch.name}}");
-            {%- for f in function_per_channel[ch] %}
-            _{{ch.name}}Consumer.AddListener({{f|first_upper}});
-            {%- endfor %}
+            _{{ch.name}}Consumer = new KafkaConsumer<Messaging.Messages.{{ch.msg_type.fqn|first_upper_fqn}}>("{{ch.name}}"
+            {%- for f in function_per_channel[ch] -%}
+            , {{f|first_upper}}
+            {%- endfor -%}
+            );
             {%- endfor %}
         }
 
