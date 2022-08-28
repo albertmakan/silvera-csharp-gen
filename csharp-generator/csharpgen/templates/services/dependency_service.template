@@ -37,7 +37,7 @@ namespace {{service_name}}.Services.Dependencies
 
             var response = httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
-            }}({{request_uri_and_body(function.dep)}}).Result;
+            }}({{function.dep|request_uri_and_body}}).Result;
             {% if function.ret_type != "void" -%}
             return response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>().Result;
             {%- endif %}
@@ -69,7 +69,7 @@ namespace {{service_name}}.Services.Dependencies
 
             var response = await httpClient.{{
             {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
-            }}({{request_uri_and_body(function.dep, "p")}});
+            }}({{function.dep|request_uri_and_body("p")}});
             {% if function.ret_type == "void" -%}
             return true;
             {%- else -%}

@@ -43,12 +43,12 @@ CSHARP = {
     },
 
     "DEF_RET_VAL": {
-        INT: 0,
-        i16: 0,
-        i32: 0,
-        i64: 0,
-        FLOAT: 0.0,
-        DOUBLE: 0.0,
+        INT: '0',
+        i16: '0',
+        i32: '0',
+        i64: '0L',
+        FLOAT: '0.0f',
+        DOUBLE: '0.0',
         STRING: '""',
         PASSWORD: '""',
         BOOL: "false",
@@ -106,10 +106,7 @@ def get_default_for_cb_pattern(func: Function):
     if func.cb_pattern in ("fallback_method", "fallback_static"):
         return get_default_ret_val(func.ret_type)
     elif func.cb_pattern == "fallback_stubbed":
-        if isinstance(func.ret_type, TypeDef):
-            return "new()"
-        else:
-            return get_default_ret_val(func.ret_type)
+        return get_default_ret_val(func.ret_type)
     elif func.cb_pattern == "fail_silent":
         warnings.warn("Circuit Breaker pattern 'fail_silent' returns default value instead of empty response.")
         return get_default_ret_val(func.ret_type)

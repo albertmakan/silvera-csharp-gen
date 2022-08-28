@@ -40,8 +40,8 @@ class ServiceGenerator:
         env.filters["param_names_controller"] = param_names_controller
         env.filters["param_names"] = lambda f: ", ".join([p.name for p in f.params])
         env.filters["get_default_ret_val"] = get_default_for_cb_pattern
+        env.filters["request_uri_and_body"] = request_uri_and_body
 
-        env.globals["request_uri_and_body"] = request_uri_and_body
         env.globals["as_type"] = lambda t: "Models."+t
         env.globals["service_name"] = self.service.name
         env.globals["header_comment"] = get_comment
@@ -299,16 +299,6 @@ class ServiceGenerator:
             create_package(mg, messages_path)
 
 
-def generate(service: ServiceDecl, output_dir: str, debug: bool):
-    print("Called C#!")
-    print(service, output_dir, debug)
-    sg = ServiceGenerator(service, output_dir)
-    try:
-        sg.generate()
-    except Exception as e:
-        sys.exit(e)
-
-
 def consumer_f(service: ServiceDecl):
     mpf, fpc = defaultdict(set), defaultdict(set)
     internal = service.api.internal
@@ -321,6 +311,16 @@ def consumer_f(service: ServiceDecl):
                     mpf[f.name].add(sub.channel.msg_type.fqn)
                     fpc[sub.channel].add(f.name)
     return mpf, fpc
+
+
+def generate(service: ServiceDecl, output_dir: str, debug: bool):
+    print("Called C#!")
+    print(service, output_dir, debug)
+    sg = ServiceGenerator(service, output_dir)
+    try:
+        sg.generate()
+    except Exception as e:
+        sys.exit(e)
 
 
 # Create C# generator.
