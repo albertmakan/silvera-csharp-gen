@@ -7,42 +7,41 @@ using System;
 using System.Text;
 using System.Text.Json;
 
-namespace {{service_name}}.Messaging
+namespace {{service_name}}.Messaging;
+
+public interface IKafkaConsumer<TMessage> where TMessage : IMessage
 {
-    public interface IKafkaConsumer<TMessage> where TMessage : IMessage
+    void AddListener(Action<TMessage> listener);
+}
+
+public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage : IMessage
+{
+    private readonly string _topic;
+    private readonly ClusterClient _clusterClient;
+
+    public KafkaConsumer(string topic, params Action<TMessage>[] actions)
     {
-        void AddListener(Action<TMessage> listener);
+        _topic = topic;
+        _clusterClient = new(new() { Seeds = "localhost:9092" }, new ConsoleLogger());
+        foreach (var action in actions) AddListener(action);
+        _clusterClient.ConsumeFromLatest(_topic);
     }
 
-    public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage : IMessage
+    public void AddListener(Action<TMessage> action)
     {
-        private readonly string _topic;
-        private readonly ClusterClient _clusterClient;
-
-        public KafkaConsumer(string topic, params Action<TMessage>[] actions)
+        _clusterClient.MessageReceived += record =>
         {
-            _topic = topic;
-            _clusterClient = new(new() { Seeds = "localhost:9092" }, new ConsoleLogger());
-            foreach (var action in actions) AddListener(action);
-            _clusterClient.ConsumeFromLatest(_topic);
-        }
-
-        public void AddListener(Action<TMessage> action)
-        {
-            _clusterClient.MessageReceived += record =>
+            string msg = "";
+            try
             {
-                string msg = "";
-                try
-                {
-                    msg = Encoding.UTF8.GetString(record.Value as byte[]);
-                    TMessage message = JsonSerializer.Deserialize<TMessage>(msg);
-                    action(message);
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine($"Invalid message received: {msg}");
-                }
-            };
-        }
+                msg = Encoding.UTF8.GetString(record.Value as byte[]);
+                TMessage message = JsonSerializer.Deserialize<TMessage>(msg);
+                action(message);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine($"Invalid message received: {msg}");
+            }
+        };
     }
 }

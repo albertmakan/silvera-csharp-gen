@@ -3,18 +3,17 @@
 using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
 
-namespace {{service_name}}.Models
+namespace {{service_name}}.Models;
+
+public class {{typedef.name}}
 {
-    public class {{typedef.name}}
-    {
-        {% if not id_field -%}
-        [BsonId]
-        public string Id { get; set; }
-        {%- endif %}
-        {%- for field in typedef.fields %}
-        {% if field.required %}[Required]{% endif %}
-        {%- if field.isid %}[BsonId]{% endif %}
-        public {{field.type|convert_type_in_model}} {{field.name|first_upper}} { get; set; }
-        {%- endfor %}
-    }
+    {% if not id_field -%}
+    [BsonId]
+    public string Id { get; set; }
+    {%- endif %}
+    {%- for field in typedef.fields %}
+    {% if field.required %}[Required]{% endif %}
+    {%- if field.isid %}[BsonId]{% endif %}
+    public {{field.type|convert_type_in_model}} {{field.name|first_upper}} { get; set; }
+    {%- endfor %}
 }

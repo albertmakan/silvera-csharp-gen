@@ -1,9 +1,8 @@
 /**{{header_comment()}}*/
 
-namespace {{service_name}}.Repository.Contracts
+namespace {{service_name}}.Repository.Contracts;
+
+public interface I{{typedef}}Repository : IRepository<{{as_type(typedef)}}, {{id_datatype}}>
 {
-    public interface I{{typedef}}Repository : IRepository<{{as_type(typedef)}}, {{id_datatype}}>
-    {
-        // custom repo methods
-    }
+    // custom repo methods
 }

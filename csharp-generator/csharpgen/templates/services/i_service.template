@@ -1,34 +1,33 @@
 /**{{header_comment()}}*/
 
-namespace {{service_name}}.Services.Base
+namespace {{service_name}}.Services.Base;
+
+public interface I{{service_name}}Service
 {
-    public interface I{{service_name}}Service
-    {
-        {%- for t in service.api.typedefs %}
-        {%- set id_datatype = "string" -%}
-        {%- set typename = as_type(t.name) -%}
-        {%- if "@create" in t.crud_dict %}
-        {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}});
-        {%- endif %}
-        {%- if "@update" in t.crud_dict %}
-        {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update);
-        {%- endif %}
-        {%- if "@read" in t.crud_dict %}
-        {{typename}} Read{{t.name}}({{id_datatype}} id);
-        {%- endif %}
-        {%- if "@delete" in t.crud_dict %}
-        void Delete{{t.name}}({{id_datatype}} id);
-        {%- endif %}
-        {%- endfor%}
+    {%- for t in service.api.typedefs %}
+    {%- set id_datatype = "string" -%}
+    {%- set typename = as_type(t.name) -%}
+    {%- if "@create" in t.crud_dict %}
+    {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}});
+    {%- endif %}
+    {%- if "@update" in t.crud_dict %}
+    {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update);
+    {%- endif %}
+    {%- if "@read" in t.crud_dict %}
+    {{typename}} Read{{t.name}}({{id_datatype}} id);
+    {%- endif %}
+    {%- if "@delete" in t.crud_dict %}
+    void Delete{{t.name}}({{id_datatype}} id);
+    {%- endif %}
+    {%- endfor%}
 
-        {%- for function in service.api.functions %}
-        {{function|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}});
-        {%- endfor %}
+    {%- for function in service.api.functions %}
+    {{function|convert_type}} {{function.name|first_upper}}({{function|unfold_function_params}});
+    {%- endfor %}
 
-        {%- for func in msg_per_function %}
-        {%- for msg_fqn in msg_per_function[func] %}
-        void {{func|first_upper}}(Messaging.Messages.{{msg_fqn|first_upper_fqn}} message);
-        {%- endfor %}
-        {%- endfor %}
-    }
+    {%- for func in msg_per_function %}
+    {%- for msg_fqn in msg_per_function[func] %}
+    void {{func|first_upper}}(Messaging.Messages.{{msg_fqn|first_upper_fqn}} message);
+    {%- endfor %}
+    {%- endfor %}
 }

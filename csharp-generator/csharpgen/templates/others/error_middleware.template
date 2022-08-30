@@ -6,34 +6,33 @@ using System.Net;
 using System.Threading.Tasks;
 using {{service_name}}.Exceptions;
 
-namespace {{service_name}}.Middleware
-{
-    public class ErrorHandlerMiddleware
-    {
-        private readonly RequestDelegate _next;
-        public ErrorHandlerMiddleware(RequestDelegate next) => _next = next;
+namespace {{service_name}}.Middleware;
 
-        public async Task InvokeAsync(HttpContext context)
+public class ErrorHandlerMiddleware
+{
+    private readonly RequestDelegate _next;
+    public ErrorHandlerMiddleware(RequestDelegate next) => _next = next;
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
         {
-            try
+            await _next(context);
+        }
+        catch (Exception exception)
+        {
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)(exception switch
             {
-                await _next(context);
-            }
-            catch (Exception exception)
-            {
-                context.Response.ContentType = "application/json";
-                context.Response.StatusCode = (int)(exception switch
-                {
-                    BadLogicException => HttpStatusCode.BadRequest,
-                    UnauthorizedException => HttpStatusCode.Unauthorized,
-                    ForbiddenException => HttpStatusCode.Forbidden,
-                    NotFoundException => HttpStatusCode.NotFound,
-                    ConflictException => HttpStatusCode.Conflict,
-                    NotImplementedException => HttpStatusCode.NotImplemented,
-                    _ => HttpStatusCode.InternalServerError,
-                });
-                await context.Response.WriteAsJsonAsync(new { context.Response.StatusCode, exception.Message });
-            }
+                BadLogicException => HttpStatusCode.BadRequest,
+                UnauthorizedException => HttpStatusCode.Unauthorized,
+                ForbiddenException => HttpStatusCode.Forbidden,
+                NotFoundException => HttpStatusCode.NotFound,
+                ConflictException => HttpStatusCode.Conflict,
+                NotImplementedException => HttpStatusCode.NotImplemented,
+                _ => HttpStatusCode.InternalServerError,
+            });
+            await context.Response.WriteAsJsonAsync(new { context.Response.StatusCode, exception.Message });
         }
     }
 }

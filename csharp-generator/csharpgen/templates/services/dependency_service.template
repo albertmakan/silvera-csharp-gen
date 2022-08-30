@@ -8,81 +8,80 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using {{service_name}}.Utils;
 
-namespace {{service_name}}.Services.Dependencies
+namespace {{service_name}}.Services.Dependencies;
+
+public interface I{{dependency_service_name}}Client
 {
-    public interface I{{dependency_service_name}}Client
+    {%- for function in functions %}
+    {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}});
+    {%- endfor %}
+}
+
+public class {{dependency_service_name}}Client : I{{dependency_service_name}}Client
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public {{dependency_service_name}}Client(IHttpClientFactory httpClientFactory)
     {
-        {%- for function in functions %}
-        {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}});
-        {%- endfor %}
+        _httpClientFactory = httpClientFactory;
     }
-
-    public class {{dependency_service_name}}Client : I{{dependency_service_name}}Client
-    {
-        private readonly IHttpClientFactory _httpClientFactory;
-
-        public {{dependency_service_name}}Client(IHttpClientFactory httpClientFactory)
-        {
-            _httpClientFactory = httpClientFactory;
-        }
-        {% for function in functions %}
-        // {{function.cb_pattern}}
-        public {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}})
-        {
-            {% if function.cb_pattern and function.cb_pattern != "fail_fast" -%}
-            {{"" if function.ret_type == "void" else "return " -}}
-            new {{function.name|first_upper}}Command(_httpClientFactory, new({{function.dep|param_names}})).Execute();
-            {%- else -%}
-            var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
-
-            var response = httpClient.{{
-            {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
-            }}({{function.dep|request_uri_and_body}}).Result;
-            {% if function.ret_type != "void" -%}
-            return response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>().Result;
-            {%- endif %}
-            {%- endif %}
-        }
-        {% endfor %}
-    }
-
     {% for function in functions %}
-    {% if function.cb_pattern and function.cb_pattern != "fail_fast" -%}
-    public class {{function.name|first_upper}}Command : HystrixCommand<{{
-        "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}>
+    // {{function.cb_pattern}}
+    public {{function.ret_type|convert_dep_type}} {{function.name|first_upper}}({{function|unfold_dep_function_params}})
     {
-        private readonly IHttpClientFactory _httpClientFactory;
-        public record struct Params({{function|unfold_record_params}});
-        private Params p;
-
-        public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory, Params @params)
-            : base(HystrixCommandGroupKeyDefault.AsKey("{{dependency_service_name}}Group"))
-        {
-            _httpClientFactory = httpClientFactory;
-            p = @params;
-        }
-
-        protected override async Task<{{
-            "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}> RunAsync()
-        {
-            var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
-
-            var response = await httpClient.{{
-            {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
-            }}({{function.dep|request_uri_and_body("p")}});
-            {% if function.ret_type == "void" -%}
-            return true;
-            {%- else -%}
-            return await response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>();
-            {%- endif %}
-        }
-
-        {% if function.ret_type == "void" -%}
-        protected override bool RunFallback() => false;
+        {% if function.cb_pattern and function.cb_pattern != "fail_fast" -%}
+        {{"" if function.ret_type == "void" else "return " -}}
+        new {{function.name|first_upper}}Command(_httpClientFactory, new({{function.dep|param_names}})).Execute();
         {%- else -%}
-        protected override {{function.ret_type|convert_dep_type}} RunFallback() => {{function|get_default_ret_val}};
+        var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
+
+        var response = httpClient.{{
+        {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
+        }}({{function.dep|request_uri_and_body}}).Result;
+        {% if function.ret_type != "void" -%}
+        return response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>().Result;
+        {%- endif %}
         {%- endif %}
     }
-    {%- endif %}
     {% endfor %}
 }
+
+{% for function in functions %}
+{% if function.cb_pattern and function.cb_pattern != "fail_fast" -%}
+public class {{function.name|first_upper}}Command : HystrixCommand<{{
+    "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}>
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+    public record struct Params({{function|unfold_record_params}});
+    private Params p;
+
+    public {{function.name|first_upper}}Command(IHttpClientFactory httpClientFactory, Params @params)
+        : base(HystrixCommandGroupKeyDefault.AsKey("{{dependency_service_name}}Group"))
+    {
+        _httpClientFactory = httpClientFactory;
+        p = @params;
+    }
+
+    protected override async Task<{{
+        "bool" if function.ret_type == "void" else function.ret_type|convert_dep_type}}> RunAsync()
+    {
+        var httpClient = _httpClientFactory.CreateClient("{{dependency_service_name}}");
+
+        var response = await httpClient.{{
+        {"GET":"GetAsync","POST":"PostAsJsonAsync","PUT":"PutAsJsonAsync","DELETE":"DeleteAsync"}[function.dep.http_verb]
+        }}({{function.dep|request_uri_and_body("p")}});
+        {% if function.ret_type == "void" -%}
+        return true;
+        {%- else -%}
+        return await response.Content.ReadFromJsonAsync<{{function.ret_type|convert_dep_type}}>();
+        {%- endif %}
+    }
+
+    {% if function.ret_type == "void" -%}
+    protected override bool RunFallback() => false;
+    {%- else -%}
+    protected override {{function.ret_type|convert_dep_type}} RunFallback() => {{function|get_default_ret_val}};
+    {%- endif %}
+}
+{%- endif %}
+{% endfor %}

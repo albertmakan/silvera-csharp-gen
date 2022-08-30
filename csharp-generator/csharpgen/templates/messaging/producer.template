@@ -5,31 +5,30 @@ using {{service_name}}.Messaging.Messages;
 using System;
 using System.Text.Json;
 
-namespace {{service_name}}.Messaging
+namespace {{service_name}}.Messaging;
+
+public interface IKafkaProducer
 {
-    public interface IKafkaProducer
-    {
-        object Send(string topic, IMessage message);
-    }
+    object Send(string topic, IMessage message);
+}
 
-    public class KafkaProducer : IKafkaProducer
-    {
-        private readonly ProducerConfig _config = new() { BootstrapServers = "localhost:9092" };
+public class KafkaProducer : IKafkaProducer
+{
+    private readonly ProducerConfig _config = new() { BootstrapServers = "localhost:9092" };
 
-        public object Send(string topic, IMessage message)
+    public object Send(string topic, IMessage message)
+    {
+        using (var producer = new ProducerBuilder<Null, string>(_config).Build())
         {
-            using (var producer = new ProducerBuilder<Null, string>(_config).Build())
+            try
             {
-                try
-                {
-                    return producer.ProduceAsync(topic, new() { Value = JsonSerializer.Serialize(message) });
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Something went wrong while sending: {e}");
-                }
+                return producer.ProduceAsync(topic, new() { Value = JsonSerializer.Serialize(message) });
             }
-            return null;
+            catch (Exception e)
+            {
+                Console.WriteLine($"Something went wrong while sending: {e}");
+            }
         }
+        return null;
     }
 }

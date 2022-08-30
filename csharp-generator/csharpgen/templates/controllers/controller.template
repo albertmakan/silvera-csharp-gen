@@ -4,59 +4,58 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net.Mime;
 using {{service_name}}.Services.Base;
 
-namespace {{service_name}}.Controller
-{
-    [ApiController]
-    [Produces(MediaTypeNames.Application.Json)]
-    public class {{service_name}}Controller : ControllerBase
-    {
-        private readonly I{{service_name}}Service _{{service_name|first_lower}}Service;
+namespace {{service_name}}.Controller;
 
-        public {{service_name}}Controller(I{{service_name}}Service {{service_name|first_lower}}Service)
-        {
-            _{{service_name|first_lower}}Service = {{service_name|first_lower}}Service;
-        }
-        {% for t in api.typedefs -%}
-        {%- set id_datatype = "string" -%}
-        {%- set typename = as_type(t.name) -%}
-        {% if "@create" in t.crud_dict %}
-        [HttpPost("{{t.name|lower}}")]
-        public {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}})
-        {
-            return _{{service_name|first_lower}}Service.Create{{t.name}}({{t.name|lower}});
-        }
-        {%- endif %}
-        {% if "@read" in t.crud_dict %}
-        [HttpGet("{{t.name|lower}}/{id}")]
-        public {{typename}} Read{{t.name}}({{id_datatype}} id)
-        {
-            return _{{service_name|first_lower}}Service.Read{{t.name}}(id);
-        }
-        {%- endif %}
-        {% if "@update" in t.crud_dict %}
-        [HttpPut("{{t.name|lower}}/{id}")]
-        public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
-        {
-            return _{{service_name|first_lower}}Service.Update{{t.name}}(id, {{t.name|lower}}Update);
-        }
-        {%- endif %}
-        {% if "@delete" in t.crud_dict %}
-        [HttpDelete("{{t.name|lower}}/{id}")]
-        public void Delete{{t.name}}({{id_datatype}} id)
-        {
-            _{{service_name|first_lower}}Service.Delete{{t.name}}(id);
-        }
-        {%- endif %}
-        {%- endfor %}
-        {%- for function in api.functions %}
-        [Http{{function.http_verb|title}}("{{function.rest_path.split('?')[0]}}")]
-        public {{"async " if function.is_async() else "" }}{{function|convert_type}} {{function.name|first_upper -}}
-            ({{function|unfold_controller_function_params}})
-        {
-            {{"" if function.ret_type == "void" else "return " -}}
-            {{"await " if function.is_async() else "" -}}
-            _{{service_name|first_lower}}Service.{{function.name|first_upper}}({{function|param_names_controller}});
-        }
-        {% endfor %}
+[ApiController]
+[Produces(MediaTypeNames.Application.Json)]
+public class {{service_name}}Controller : ControllerBase
+{
+    private readonly I{{service_name}}Service _{{service_name|first_lower}}Service;
+
+    public {{service_name}}Controller(I{{service_name}}Service {{service_name|first_lower}}Service)
+    {
+        _{{service_name|first_lower}}Service = {{service_name|first_lower}}Service;
     }
+    {% for t in api.typedefs -%}
+    {%- set id_datatype = "string" -%}
+    {%- set typename = as_type(t.name) -%}
+    {% if "@create" in t.crud_dict %}
+    [HttpPost("{{t.name|lower}}")]
+    public {{typename}} Create{{t.name}}({{typename}} {{t.name|lower}})
+    {
+        return _{{service_name|first_lower}}Service.Create{{t.name}}({{t.name|lower}});
+    }
+    {%- endif %}
+    {% if "@read" in t.crud_dict %}
+    [HttpGet("{{t.name|lower}}/{id}")]
+    public {{typename}} Read{{t.name}}({{id_datatype}} id)
+    {
+        return _{{service_name|first_lower}}Service.Read{{t.name}}(id);
+    }
+    {%- endif %}
+    {% if "@update" in t.crud_dict %}
+    [HttpPut("{{t.name|lower}}/{id}")]
+    public {{typename}} Update{{t.name}}({{id_datatype}} id, {{typename}} {{t.name|lower}}Update)
+    {
+        return _{{service_name|first_lower}}Service.Update{{t.name}}(id, {{t.name|lower}}Update);
+    }
+    {%- endif %}
+    {% if "@delete" in t.crud_dict %}
+    [HttpDelete("{{t.name|lower}}/{id}")]
+    public void Delete{{t.name}}({{id_datatype}} id)
+    {
+        _{{service_name|first_lower}}Service.Delete{{t.name}}(id);
+    }
+    {%- endif %}
+    {%- endfor %}
+    {%- for function in api.functions %}
+    [Http{{function.http_verb|title}}("{{function.rest_path.split('?')[0]}}")]
+    public {{"async " if function.is_async() else "" }}{{function|convert_type}} {{function.name|first_upper -}}
+        ({{function|unfold_controller_function_params}})
+    {
+        {{"" if function.ret_type == "void" else "return " -}}
+        {{"await " if function.is_async() else "" -}}
+        _{{service_name|first_lower}}Service.{{function.name|first_upper}}({{function|param_names_controller}});
+    }
+    {% endfor %}
 }

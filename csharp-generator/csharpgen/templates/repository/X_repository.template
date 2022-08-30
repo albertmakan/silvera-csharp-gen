@@ -3,12 +3,11 @@
 using {{service_name}}.Repository.Contracts;
 using {{service_name}}.Settings;
 
-namespace {{service_name}}.Repository.Impl
-{
-    public class {{typedef}}Repository : Repository<{{as_type(typedef)}}, {{id_datatype}}>, I{{typedef}}Repository
-    {
-        public {{typedef}}Repository(IMongoDbSettings settings) : base(settings) { }
+namespace {{service_name}}.Repository.Impl;
 
-        // implement custom repo methods
-    }
+public class {{typedef}}Repository : Repository<{{as_type(typedef)}}, {{id_datatype}}>, I{{typedef}}Repository
+{
+    public {{typedef}}Repository(IMongoDbSettings settings) : base(settings) { }
+
+    // implement custom repo methods
 }

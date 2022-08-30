@@ -1,11 +1,10 @@
 /**{{header_comment()}}*/
 
-namespace {{service_name}}.DTO
+namespace {{service_name}}.DTO;
+
+public class {{name}}
 {
-    public class {{name}}
-    {
-        {%- for (type, name) in fields %}
-        public {{type|convert_type}} {{name|first_upper}} { get; set; }
-        {%- endfor %}
-    }
+    {%- for (type, name) in fields %}
+    public {{type|convert_type}} {{name|first_upper}} { get; set; }
+    {%- endfor %}
 }

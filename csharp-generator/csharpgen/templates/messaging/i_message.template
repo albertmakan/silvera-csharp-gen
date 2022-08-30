@@ -1,8 +1,7 @@
 /**{{header_comment()}}*/
 
-namespace {{service_name}}.Messaging.Messages
-{
-    public interface IMessage { }
+namespace {{service_name}}.Messaging.Messages;
 
-    public class Message : IMessage { }
-}
+public interface IMessage { }
+
+public class Message : IMessage { }

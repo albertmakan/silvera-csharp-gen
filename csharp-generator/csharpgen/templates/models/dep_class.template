@@ -1,11 +1,10 @@
 /**{{header_comment()}}*/
 
-namespace {{service_name}}.Models.Dependencies
+namespace {{service_name}}.Models.Dependencies;
+
+public class {{typedef.name}}
 {
-    public class {{typedef.name}}
-    {
-        {%- for attr in typedef.fields %}
-        public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
-        {%- endfor %}
-    }
+    {%- for attr in typedef.fields %}
+    public {{attr.type|convert_type_in_model}} {{attr.name|first_upper}} { get; set; }
+    {%- endfor %}
 }
