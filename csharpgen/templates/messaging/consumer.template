@@ -24,7 +24,7 @@ public class KafkaConsumer<TMessage> : IKafkaConsumer<TMessage> where TMessage :
         _topic = topic;
         _clusterClient = new(new() { Seeds = "localhost:9092" }, new ConsoleLogger());
         foreach (var action in actions) AddListener(action);
-        _clusterClient.ConsumeFromLatest(_topic);
+        _clusterClient.ConsumeFromEarliest(_topic);
     }
 
     public void AddListener(Action<TMessage> action)

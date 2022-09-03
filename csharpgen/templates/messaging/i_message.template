@@ -4,4 +4,4 @@ namespace {{service_name}}.Messaging.Messages;
 
 public interface IMessage { }
 
-public class Message : IMessage { }
+public abstract class Message : IMessage { }

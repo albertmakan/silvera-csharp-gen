@@ -1,12 +1,11 @@
 from setuptools import setup
 
 setup(
-    name="csharpgen",
+    name="csharp-generator",
     version="0.0.1",
     description="C# code generator for Silvera tool",
     entry_points={
-        "silvera_generators": ["csharp = csharpgen.generator:csharp"],
-        "silvera_evaluators": ["myeval = csharpgen.evaluator:myeval"]
+        "silvera_generators": ["csharp = csharpgen.generator:csharp"]
     },
     install_requires=["silvera", "Jinja2"]
 )

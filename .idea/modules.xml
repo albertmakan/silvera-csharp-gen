@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/csharp-generator.iml" filepath="$PROJECT_DIR$/.idea/csharp-generator.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/silvera-csharp-gen.iml" filepath="$PROJECT_DIR$/.idea/silvera-csharp-gen.iml" />
     </modules>
   </component>
 </project>

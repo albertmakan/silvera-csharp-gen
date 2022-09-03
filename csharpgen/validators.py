@@ -18,6 +18,7 @@ def check_messaging(service: ServiceDecl):
         fqn = first_upper_fqn(m.fqn)
         if fqn in fqns:
             raise Exception(f"Duplicate message found: {fqn}")
+        check_fields(m)
         fqns.append(fqn)
 
     channels = {}

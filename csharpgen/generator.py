@@ -179,7 +179,8 @@ class ServiceGenerator:
             dto = self.generate_dto(first_upper(func.name)+"Request", from_body)
             params.append(f"[FromBody] DTO.{dto} request")
         elif from_body:
-            params.append(f"[FromBody] {convert_type(from_body[0].type)} {from_body[0].name}")
+            params.append(f"[FromBody] "
+                          f"{convert_type(from_body[0].type)} {from_body[0].name}")
         return ", ".join(params)
 
     def generate_dto(self, name: str, params: list[FunctionParameter]):
@@ -288,7 +289,6 @@ class ServiceGenerator:
             curr_ns = f"{parent_ns}.{ns}"
             for msg in msg_group.messages:
                 if msg in messages:
-                    check_fields(msg)
                     msg_template.stream({
                         "namespace": curr_ns, "message": msg
                     }).dump(os.path.join(curr_path, first_upper(msg.name)+".cs"))
